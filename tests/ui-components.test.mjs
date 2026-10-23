@@ -114,6 +114,15 @@ const { RiskRuleDialog } = loadUiModule(
 const { RiskDeleteDialog } = loadUiModule(
   "src/app/admin/risk/risk-delete-dialog.tsx",
 );
+const { SiteFormFields } = loadUiModule(
+  "src/app/admin/sites/site-form-fields.tsx",
+);
+const { SiteWorkHoursFields } = loadUiModule(
+  "src/app/admin/sites/site-work-hours-fields.tsx",
+);
+const { SiteBrandingSection } = loadUiModule(
+  "src/app/admin/sites/site-branding-section.tsx",
+);
 
 const noop = () => {};
 
@@ -476,6 +485,66 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("site form split components render settings, work hours and branding", () => {
+  const form = {
+    widgetSettings: {},
+    name: "Demo Site",
+    slug: "demo",
+    description: "Demo description",
+    primaryColor: "#18181b",
+    position: "right",
+    welcomeMessage: "Welcome",
+    offlineMessage: "Offline",
+    requireEmail: true,
+    autoAssign: true,
+    imageReviewEnabled: false,
+    active: true,
+    notifyEmail: "support@example.test",
+    allowedOrigins: "example.com",
+    workHoursEnabled: true,
+    workHoursTimezone: "Asia/Shanghai",
+    days: { 1: [{ start: "09:00", end: "18:00" }] },
+  };
+  const fields = renderUi(SiteFormFields, { form, update: noop });
+  assert.match(fields, /sites\.nameLabel/);
+  assert.match(fields, /sites\.allowedOrigins/);
+  assert.match(fields, /id="site-name"/);
+
+  const workHours = renderUi(SiteWorkHoursFields, {
+    form,
+    update: noop,
+    updateDay: noop,
+    addDayRange: noop,
+    removeDayRange: noop,
+  });
+  assert.match(workHours, /sites\.workHoursEnabled/);
+  assert.match(workHours, /sites\.addTimeRange/);
+  assert.match(workHours, /\u5468\u4e00/);
+
+  const branding = renderUi(SiteBrandingSection, {
+    form,
+    site: null,
+    defaultSettings: {
+      title: "Inherited",
+      logoUrl: "",
+      footerText: "Powered",
+      primaryColor: "#18181b",
+      position: "right",
+      launcherStyle: "bubble",
+      launcherLabel: "Chat",
+      imagesEnabled: true,
+      filesEnabled: true,
+      emojiEnabled: true,
+      ratingEnabled: true,
+      maxUploadMB: 10,
+    },
+    canCustomizeFooter: true,
+    update: noop,
+  });
+  assert.match(branding, /\u8bbf\u5ba2\u7a97\u53e3\u54c1\u724c\u4e0e\u529f\u80fd/);
+  assert.match(branding, /branding-editor/);
 });
 
 test("risk split components render rules, events, editor and delete confirmation", () => {
