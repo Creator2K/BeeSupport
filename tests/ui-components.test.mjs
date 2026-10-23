@@ -69,6 +69,12 @@ const { WechatLoginLogs } = loadUiModule(
 const { WechatLoginVisual } = loadUiModule(
   "src/components/admin/wechat-login-visual.tsx",
 );
+const { SubscriptionOrderCard } = loadUiModule(
+  "src/components/admin/subscription-order-card.tsx",
+);
+const { OrderDecisionDialog } = loadUiModule(
+  "src/components/admin/order-decision-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -273,6 +279,62 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(rating, /widget\.closedByAgent/);
   assert.match(rating, /widget\.rateHint/);
   assert.match(rating, /widget\.startNew/);
+});
+
+test("subscription order card and decision dialog render order actions", () => {
+  const order = {
+    id: "order-1",
+    orderNo: "BS202610230001",
+    tenantName: "Demo Merchant",
+    status: "PENDING",
+    planName: "Pro Plan",
+    features: {},
+    priceCents: 9900,
+    durationDays: 30,
+    maxAgents: 10,
+    maxSites: 3,
+    monthlyConversations: 5000,
+    storageMB: 2048,
+    merchantNote: "Please activate",
+    reviewNote: "",
+    requestedByName: "Merchant Admin",
+    reviewedByName: null,
+    paymentReference: "",
+    paymentReportedAt: "2026-10-23T09:00:00.000Z",
+    paymentNote: "Paid by transfer",
+    paymentReportVersion: 1,
+    createdAt: "2026-10-23T08:00:00.000Z",
+    validUntil: "2026-10-24T08:00:00.000Z",
+    periodStart: null,
+    periodEnd: null,
+    reviewedAt: null,
+  };
+  const card = renderUi(SubscriptionOrderCard, {
+    order,
+    platform: true,
+    onDecision: noop,
+  });
+  assert.match(card, /pending|payment-report/);
+  assert.match(card, /BS202610230001/);
+  assert.match(card, /Demo Merchant/);
+
+  const dialog = renderUi(OrderDecisionDialog, {
+    selected: order,
+    decision: "CONFIRMED",
+    note: "",
+    reference: "BANK-001",
+    ack: true,
+    pending: false,
+    error: "",
+    onOpenChange: noop,
+    onNoteChange: noop,
+    onReferenceChange: noop,
+    onAckChange: noop,
+    onSubmit: noop,
+  });
+  assert.match(dialog, /id="payment-reference"/);
+  assert.match(dialog, /id="order-review-note"/);
+  assert.ok(dialog.includes("\u786e\u8ba4\u6536\u6b3e\u5e76\u5f00\u901a"));
 });
 
 test("WeChat login split components render status, actions and config", () => {

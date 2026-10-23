@@ -267,6 +267,27 @@ export const uiDependencies = {
         .join(" "),
   },
   "@/lib/launcher": { launcherForeground: () => "#ffffff" },
+  "@/lib/clipboard": { copyText: async () => true },
+  "@/lib/subscriptions": {
+    formatPrice: (cents) => `?${(cents / 100).toFixed(2)}`,
+    orderStatusLabels: {
+      PENDING: "pending",
+      CONFIRMED: "confirmed",
+      REJECTED: "rejected",
+      CANCELLED: "cancelled",
+      EXPIRED: "expired",
+    },
+  },
+  "@/server/actions/subscriptions": {
+    decideOrderAction: async () => ({ ok: true, message: "ok" }),
+  },
+  "./feature-summary": {
+    FeatureSummary: () => React.createElement("span", null, "feature-summary"),
+  },
+  "./payment-report": {
+    PaymentReport: () =>
+      React.createElement("button", null, "payment-report"),
+  },
   "@/lib/client-action": {
     callClientAction: async () => ({ ok: true, message: "ok" }),
   },
