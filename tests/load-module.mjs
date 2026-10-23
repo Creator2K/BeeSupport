@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
 /** Execute the real service code with explicit IO doubles; no database or network access. */
-export function loadModule(filename, dependencies = {}) {
+export function loadModule(filename, dependencies = {}, compilerOptions = {}) {
   const file = resolve(filename);
   const output = ts.transpileModule(readFileSync(file, "utf8"), {
     fileName: file,
@@ -15,6 +15,8 @@ export function loadModule(filename, dependencies = {}) {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
       esModuleInterop: true,
+      jsx: ts.JsxEmit.ReactJSX,
+      ...compilerOptions,
     },
   }).outputText;
   const module = { exports: {} };
