@@ -11,6 +11,15 @@ const api = loadModule("src/lib/api.ts", {
   "next/server": { NextResponse },
   zod: { ZodError: class extends Error {} },
   "./auth": auth,
+  "./logger": { logger: { error() {} } },
+  "../server/request-context": {
+    getRequestContext: () => ({
+      requestId: "req-api-test",
+      method: "POST",
+      path: "/api/test",
+      startedAt: Date.now(),
+    }),
+  },
 });
 const post = (body, headers) =>
   new Request("http://test.local/api", { method: "POST", body, headers });
@@ -67,4 +76,13 @@ test("JSON limits count UTF-8 bytes and enforce chunked bodies without trusting 
   );
   assert.equal(cancelled, true);
   assert.ok(chunks < 10);
+});
+
+test("API errors expose the current request id for support diagnostics", async () => {
+  const response = api.toErrorResponse(new auth.HttpError(400, "bad request"));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "bad request",
+    requestId: "req-api-test",
+  });
 });

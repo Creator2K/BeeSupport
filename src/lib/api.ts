@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
+import { getRequestContext } from "../server/request-context";
 import { HttpError } from "./auth";
+import { logger } from "./logger";
 
 /** Bound JSON bodies even when a client sends chunked data without Content-Length. */
 export async function readJson(
@@ -47,9 +49,12 @@ export async function readJson(
 
 /** 统一的 API 错误映射：HttpError / ZodError / 兜底 500 */
 export function toErrorResponse(error: unknown): NextResponse {
+  const requestId = getRequestContext()?.requestId;
+  const requestMeta = requestId ? { requestId } : {};
+
   if (error instanceof HttpError) {
     return NextResponse.json(
-      { error: error.message },
+      { error: error.message, ...requestMeta },
       { status: error.status },
     );
   }
@@ -62,13 +67,17 @@ export function toErrorResponse(error: unknown): NextResponse {
           path: issue.path.join("."),
           message: issue.message,
         })),
+        ...requestMeta,
       },
       { status: 422 },
     );
   }
 
-  console.error("[api] 未处理异常:", error);
-  return NextResponse.json({ error: "服务器内部错误" }, { status: 500 });
+  logger.error("api.unhandled_error", {}, error);
+  return NextResponse.json(
+    { error: "服务器内部错误", ...requestMeta },
+    { status: 500 },
+  );
 }
 
 export function jsonOk<T>(data: T, init?: ResponseInit): NextResponse {

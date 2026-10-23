@@ -355,6 +355,10 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
       └─ actions/               # Server Actions（后台所有写操作）
 ```
 
+## 可观测性
+
+每个 HTTP 请求都会生成独立 `x-request-id`，响应头和 API 错误体中都会返回该编号。服务端以 JSON 行式输出结构化日志，包含请求方法、路径、状态码、耗时和错误信息；密码、Token、Cookie、API Key、数据库连接串等敏感值会在输出前脱敏。日志写入 stdout，可直接交给 Docker、systemd journal 或日志采集系统。
+
 ### 数据模型要点
 
 - `Site` = 站点/渠道；`SiteAgent` 做客服与站点的多对多授权（管理员默认全部可见）

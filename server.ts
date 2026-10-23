@@ -2,6 +2,7 @@ import "dotenv/config";
 // 必须排在 next 之前，补上自定义 server 缺失的运行时基线（AsyncLocalStorage）
 import "./src/server/runtime-baseline";
 
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
 import { createAdapter } from "@socket.io/redis-adapter";
@@ -9,10 +10,15 @@ import next from "next";
 import { Server as SocketIOServer } from "socket.io";
 
 import { ADMIN_PATH } from "./src/lib/app-paths";
+import { logger } from "./src/lib/logger";
 import { createRedisClient } from "./src/lib/redis";
 import { registerRealtime } from "./src/server/socket";
 import { expireStaleAgents } from "./src/server/presence";
 import { createClientIpResolver, setClientIp } from "./src/server/client-ip";
+import {
+  requestPath,
+  runWithRequestContext,
+} from "./src/server/request-context";
 import { startNotificationWorker } from "./src/server/notification-worker";
 import { startSubscriptionReminderWorker } from "./src/server/services/subscription-reminders";
 import { startUnansweredReminderWorker } from "./src/server/services/unanswered";
@@ -34,34 +40,72 @@ async function main(): Promise<void> {
   await app.prepare();
 
   const httpServer = createServer((req, res) => {
-    setClientIp(req, resolveClientIp);
-    // 后台随机入口：对外只暴露 ADMIN_PATH，/admin 直接 404。
-    // 放在这里做（而不是 middleware）是为了能在运行期读到环境变量，无需重新构建。
-    const url = req.url ?? "/";
-    if (ADMIN_PATH !== "/admin") {
-      if (
-        url === ADMIN_PATH ||
-        url.startsWith(`${ADMIN_PATH}/`) ||
-        url.startsWith(`${ADMIN_PATH}?`)
-      ) {
-        req.url = `/admin${url.slice(ADMIN_PATH.length)}`;
-      } else if (
-        url === "/admin" ||
-        url.startsWith("/admin/") ||
-        url.startsWith("/admin?")
-      ) {
-        res.statusCode = 404;
-        res.setHeader("content-type", "text/plain; charset=utf-8");
-        res.end("Not Found");
-        return;
-      }
-    }
+    const startedAt = Date.now();
+    const requestId = randomUUID();
+    const method = req.method ?? "GET";
+    const path = requestPath(req.url);
+    const context = { requestId, method, path, startedAt };
+    res.setHeader("x-request-id", requestId);
 
-    void handle(req, res).catch((error: unknown) => {
-      console.error("[next] 请求处理失败:", error);
-      if (!res.headersSent) {
-        res.statusCode = 500;
-        res.end("Internal Server Error");
+    let accessLogged = false;
+    const logAccess = (aborted: boolean) => {
+      if (accessLogged) return;
+      accessLogged = true;
+      const statusCode = aborted ? 499 : res.statusCode;
+      const fields = {
+        requestId,
+        method,
+        path,
+        statusCode,
+        durationMs: Date.now() - startedAt,
+        aborted,
+      };
+      if (aborted || statusCode >= 500) logger.error("http.request", fields);
+      else if (statusCode >= 400) logger.warn("http.request", fields);
+      else logger.info("http.request", fields);
+    };
+    res.once("finish", () => logAccess(false));
+    res.once("close", () => {
+      if (!res.writableFinished) logAccess(true);
+    });
+
+    void runWithRequestContext(context, async () => {
+      try {
+        setClientIp(req, resolveClientIp);
+        // Rewrite the public admin path at runtime without rebuilding Next.
+        const url = req.url ?? "/";
+        if (ADMIN_PATH !== "/admin") {
+          if (
+            url === ADMIN_PATH ||
+            url.startsWith(`${ADMIN_PATH}/`) ||
+            url.startsWith(`${ADMIN_PATH}?`)
+          ) {
+            req.url = `/admin${url.slice(ADMIN_PATH.length)}`;
+          } else if (
+            url === "/admin" ||
+            url.startsWith("/admin/") ||
+            url.startsWith("/admin?")
+          ) {
+            res.statusCode = 404;
+            res.setHeader("content-type", "text/plain; charset=utf-8");
+            res.end("Not Found");
+            return;
+          }
+        }
+
+        await handle(req, res);
+      } catch (error) {
+        logger.error(
+          "http.request_failed",
+          { statusCode: res.headersSent ? res.statusCode : 500 },
+          error,
+        );
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.end("Internal Server Error");
+        } else if (!res.writableEnded) {
+          res.destroy(error instanceof Error ? error : undefined);
+        }
       }
     });
   });
@@ -79,9 +123,9 @@ async function main(): Promise<void> {
   const subClient = createRedisClient();
   if (pubClient && subClient) {
     io.adapter(createAdapter(pubClient, subClient));
-    console.log("[realtime] 已启用 Redis adapter（支持多实例水平扩展）");
+    logger.info("realtime.redis_adapter", { enabled: true });
   } else {
-    console.log("[realtime] 未配置 REDIS_URL，实时通道运行在单实例模式");
+    logger.info("realtime.redis_adapter", { enabled: false });
   }
 
   registerRealtime(io);
@@ -90,7 +134,7 @@ async function main(): Promise<void> {
   const stopUnanswered = startUnansweredReminderWorker();
   const expirePresence = () =>
     void expireStaleAgents().catch((error: unknown) =>
-      console.error("[presence] 在线状态清理失败:", error),
+      logger.error("presence.cleanup_failed", {}, error),
     );
   expirePresence();
   const presenceTimer = setInterval(expirePresence, 30_000);
@@ -98,14 +142,14 @@ async function main(): Promise<void> {
 
   httpServer.listen(port, hostname, () => {
     const shownHost = hostname === "0.0.0.0" ? "localhost" : hostname;
-    console.log(
-      `> BeeSupport ready on http://${shownHost}:${port} (${dev ? "development" : "production"})`,
-    );
-    console.log(
-      `  访客端接入脚本： http://${shownHost}:${port}/widget.js?key=<站点密钥>`,
-    );
-    console.log(`  客服工作台：     http://${shownHost}:${port}/agent`);
-    console.log(`  管理后台：       http://${shownHost}:${port}${ADMIN_PATH}`);
+    const baseUrl = `http://${shownHost}:${port}`;
+    logger.info("server.listening", {
+      environment: dev ? "development" : "production",
+      baseUrl,
+      widgetUrl: `${baseUrl}/widget.js?key=<site-key>`,
+      agentUrl: `${baseUrl}/agent`,
+      adminUrl: `${baseUrl}${ADMIN_PATH}`,
+    });
 
     // 后台开了「启用微信通知」就随服务一起登录，避免重启后漏掉提醒
     void (async () => {
@@ -113,7 +157,7 @@ async function main(): Promise<void> {
         await import("./src/server/services/wechatbot");
       await ensureWechatBot();
     })().catch((error: unknown) => {
-      console.error("[wechatbot] 启动检查失败:", error);
+      logger.error("wechat.startup_check_failed", {}, error);
     });
   });
 
@@ -122,7 +166,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(presenceTimer);
-    console.log(`\n[server] 收到 ${signal}，正在优雅退出...`);
+    logger.info("server.shutdown_started", { signal });
     const deadline = setTimeout(() => process.exit(1), 30_000);
     deadline.unref();
     try {
@@ -144,6 +188,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error("[server] 启动失败:", error);
+  logger.error("server.startup_failed", {}, error);
   process.exit(1);
 });
