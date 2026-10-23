@@ -1,25 +1,20 @@
-/* eslint-disable @next/next/no-img-element -- Tenant logos are external URLs rendered directly, without a server image proxy. */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  Loader2,
-  MessageSquare,
-  Paperclip,
-  Send,
-  Star,
-  X,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 import { MessageBubble } from "@/components/agent/message-bubble";
+import { WidgetClosedCard } from "@/components/widget/widget-closed-card";
+import { WidgetComposer } from "@/components/widget/widget-composer";
+import { WidgetHeader } from "@/components/widget/widget-header";
+import { WidgetIdentityForm } from "@/components/widget/widget-identity-form";
+import type {
+  Availability,
+  SiteConfig,
+} from "@/components/widget/widget-types";
 import { useT } from "@/components/locale-provider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { EmojiPicker } from "@/components/emoji-picker";
 import type { ImageGate } from "@/server/services/image-review";
 import type { SerializedMessage } from "@/lib/realtime/types";
 import type { VisitorConversation } from "@/lib/realtime/public";
@@ -40,32 +35,6 @@ import {
   pickVisitorEnv,
   type VisitorEnv,
 } from "@/lib/visitor-env";
-import { cn } from "@/lib/utils";
-import { launcherForeground } from "@/lib/launcher";
-
-type SiteConfig = {
-  title: string;
-  logoUrl: string;
-  footerText: string;
-  imagesEnabled: boolean;
-  filesEnabled: boolean;
-  emojiEnabled: boolean;
-  ratingEnabled: boolean;
-  maxUploadMB: number;
-  name: string;
-  publicKey: string;
-  primaryColor: string;
-  position: string;
-  welcomeMessage: string;
-  offlineMessage: string;
-  requireEmail: boolean;
-};
-
-type Availability = {
-  online: boolean;
-  agentsOnline: number;
-  withinWorkHours: boolean;
-};
 
 type StoredIdentity = { token: string; email: string; name: string | null };
 
@@ -1033,57 +1002,13 @@ export function WidgetChat({
 
   const isClosed = conversation?.status === "CLOSED";
   const showOfflineNotice = !availability.online && !conversation;
-  const accentColor = config?.primaryColor ?? "#18181b";
-
-  const statusLabel = useMemo(() => {
-    if (availability.online) return t("widget.siteOnline");
-    return t("widget.siteOffline");
-  }, [availability.online, t]);
-
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 items-center gap-2.5 px-3.5 py-3 text-white"
-        style={{
-          backgroundColor: accentColor,
-          color: launcherForeground(accentColor),
-        }}
-      >
-        <div className="flex size-8 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">
-          {config?.logoUrl ? (
-            <img
-              src={config.logoUrl}
-              alt=""
-              className="size-8 rounded-full object-contain"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            (config?.name ?? "B").slice(0, 1)
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">
-            {config?.title || config?.name || t("widget.greetingTitle")}
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] opacity-85">
-            <span
-              className={cn(
-                "size-1.5 rounded-full",
-                availability.online ? "bg-emerald-400" : "bg-zinc-300",
-              )}
-            />
-            {statusLabel}
-          </div>
-        </div>
-        <button
-          type="button"
-          aria-label={t("widget.close")}
-          className="rounded-md p-1.5 transition-colors hover:bg-white/15"
-          onClick={() => postToParent({ type: "beesupport:close" })}
-        >
-          <X className="size-4" />
-        </button>
-      </header>
+      <WidgetHeader
+        config={config}
+        online={availability.online}
+        onClose={() => postToParent({ type: "beesupport:close" })}
+      />
 
       {mode === "loading" ? (
         <div className="text-muted-foreground flex flex-1 items-center justify-center gap-2 text-sm">
@@ -1105,71 +1030,17 @@ export function WidgetChat({
       ) : null}
 
       {mode === "form" ? (
-        <form
-          className="flex flex-1 flex-col gap-4 overflow-y-auto p-5"
-          onSubmit={startSession}
-        >
-          <div className="space-y-1.5">
-            <h1 className="text-base font-semibold">
-              {t("widget.startFormTitle")}
-            </h1>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              {config?.offlineMessage && !availability.online
-                ? config.offlineMessage
-                : t("widget.startFormHint")}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="visitor-email" className="text-xs">
-              {t("widget.emailLabel")}
-              {config?.requireEmail ? (
-                <span className="text-destructive ml-0.5">*</span>
-              ) : null}
-            </Label>
-            <Input
-              id="visitor-email"
-              type="email"
-              required={config?.requireEmail ?? true}
-              value={email}
-              placeholder={t("widget.emailPlaceholder")}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="visitor-name" className="text-xs">
-              {t("widget.nameLabel")}
-            </Label>
-            <Input
-              id="visitor-name"
-              value={name}
-              placeholder={t("widget.namePlaceholder")}
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-
-          {formError ? (
-            <p className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
-              {formError}
-            </p>
-          ) : null}
-
-          <Button type="submit" disabled={submitting} className="w-full">
-            {submitting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t("widget.starting")}
-              </>
-            ) : (
-              t("widget.start")
-            )}
-          </Button>
-
-          <p className="text-muted-foreground mt-auto text-center text-[11px]">
-            {t("widget.poweredBy")}
-          </p>
-        </form>
+        <WidgetIdentityForm
+          config={config}
+          online={availability.online}
+          email={email}
+          name={name}
+          formError={formError}
+          submitting={submitting}
+          onEmailChange={setEmail}
+          onNameChange={setName}
+          onSubmit={(event) => void startSession(event)}
+        />
       ) : null}
 
       {mode === "chat" ? (
@@ -1246,202 +1117,43 @@ export function WidgetChat({
             ) : null}
 
             {isClosed ? (
-              <div className="space-y-3 rounded-lg border px-3 py-3">
-                <p className="text-sm font-medium">
-                  {t("widget.closedByAgent")}
-                </p>
-                {!config?.ratingEnabled ? null : ratingSubmitted ||
-                  conversation?.rating ? (
-                  <p className="text-muted-foreground text-xs">
-                    {t("widget.rateThanks")}
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-muted-foreground text-xs">
-                      {t("widget.rateHint")}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          aria-label={`${value}`}
-                          onClick={() => setRatingValue(value)}
-                        >
-                          <Star
-                            className={cn(
-                              "size-5",
-                              value <= ratingValue
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-muted-foreground",
-                            )}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                    <Textarea
-                      value={ratingComment}
-                      rows={2}
-                      className="text-xs"
-                      placeholder={t("widget.rateComment")}
-                      onChange={(event) => setRatingComment(event.target.value)}
-                    />
-                    <Button
-                      size="sm"
-                      disabled={ratingValue === 0}
-                      onClick={() => void submitRating()}
-                    >
-                      {t("widget.rateSubmit")}
-                    </Button>
-                  </div>
-                )}
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={startNewConversation}
-                >
-                  <ArrowLeft className="size-3.5" />
-                  <span className="ml-1.5">{t("widget.startNew")}</span>
-                </Button>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="pb-safe shrink-0 border-t px-3 py-2.5">
-            {newMessagesBelow ? (
-              <Button
-                className="mb-2 w-full"
-                variant="secondary"
-                size="sm"
-                onClick={scrollToLatest}
-              >
-                {t("common.newMessages")}
-              </Button>
-            ) : null}
-            {imageGate.enabled && (
-              <div
-                role="status"
-                className="mb-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs leading-5"
-              >
-                <p>
-                  {t(
-                    imageGate.pending
-                      ? imageGate.pending.sent
-                        ? "images.waiting"
-                        : "images.unsent"
-                      : "images.enabled",
-                  )}
-                </p>
-                {imageGate.pending && !imageGate.pending.sent && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={uploading}
-                      onClick={() => void recoverImage()}
-                    >
-                      {t("images.retry")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={uploading}
-                      onClick={() => void recoverImage(true)}
-                    >
-                      {t("images.cancel")}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex items-end gap-2">
-              <Textarea
-                ref={composerRef}
-                value={draft}
-                rows={1}
-                placeholder={t("widget.messagePlaceholder")}
-                className="max-h-32 min-h-9 flex-1 resize-none text-sm"
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  if (socket && conversation?.id) {
-                    socket.emit("typing", {
-                      conversationId: conversation.id,
-                      isTyping: true,
-                    });
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (
-                    event.key === "Enter" &&
-                    !event.shiftKey &&
-                    !event.nativeEvent.isComposing &&
-                    event.nativeEvent.keyCode !== 229
-                  ) {
-                    event.preventDefault();
-                    void sendMessage();
-                  }
-                }}
-                onPaste={(event) => void handlePaste(event)}
+              <WidgetClosedCard
+                ratingEnabled={Boolean(config?.ratingEnabled)}
+                ratingSubmitted={ratingSubmitted}
+                existingRating={conversation?.rating}
+                ratingValue={ratingValue}
+                ratingComment={ratingComment}
+                onRatingValueChange={setRatingValue}
+                onRatingCommentChange={setRatingComment}
+                onSubmitRating={() => void submitRating()}
+                onStartNew={startNewConversation}
               />
-
-              {config?.emojiEnabled && (
-                <EmojiPicker
-                  textareaRef={composerRef}
-                  value={draft}
-                  onChange={setDraft}
-                  disabled={sending}
-                />
-              )}
-
-              {(config?.imagesEnabled || config?.filesEnabled) && (
-                <label
-                  className={cn(
-                    "border-input inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border focus-within:ring-2 focus-within:ring-ring",
-                    uploading && "pointer-events-none opacity-50",
-                  )}
-                  title={t("widget.attach")}
-                >
-                  {uploading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Paperclip className="size-4" />
-                  )}
-                  <input
-                    type="file"
-                    accept={config?.filesEnabled ? undefined : "image/*"}
-                    className="sr-only"
-                    disabled={uploading}
-                    aria-label={t("widget.attach")}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) void uploadFile(file);
-                      event.target.value = "";
-                    }}
-                  />
-                </label>
-              )}
-
-              <Button
-                size="icon"
-                className="size-9 shrink-0"
-                disabled={!draft.trim() || sending}
-                onClick={() => void sendMessage()}
-                title={t("widget.send")}
-              >
-                {sending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Send className="size-4" />
-                )}
-              </Button>
-            </div>
-
-            <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center justify-between gap-x-2 text-[10px]">
-              <span>{config?.imagesEnabled ? t("widget.pasteHint") : ""}</span>
-              <span>{config?.footerText ?? t("widget.poweredBy")}</span>
-            </div>
+            ) : null}
           </div>
+
+          <WidgetComposer
+            config={config}
+            composerRef={composerRef}
+            draft={draft}
+            sending={sending}
+            uploading={uploading}
+            newMessagesBelow={newMessagesBelow}
+            imageGate={imageGate}
+            onDraftChange={setDraft}
+            onTyping={() => {
+              if (socket && conversation?.id) {
+                socket.emit("typing", {
+                  conversationId: conversation.id,
+                  isTyping: true,
+                });
+              }
+            }}
+            onSend={() => void sendMessage()}
+            onPaste={(event) => void handlePaste(event)}
+            onUpload={(file) => void uploadFile(file)}
+            onRecoverImage={(cancel) => void recoverImage(cancel)}
+            onScrollToLatest={scrollToLatest}
+          />
         </>
       ) : null}
     </div>
