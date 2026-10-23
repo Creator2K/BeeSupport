@@ -136,6 +136,10 @@ const visitorPanelShared = loadModule(
 const visitorInsightsShared = loadModule(
   "src/components/admin/visitor-insights-shared.ts",
 );
+const brandingFields = loadModule(
+  "src/components/admin/branding-fields.ts",
+);
+const brandingValue = loadModule("src/components/admin/branding-value.ts");
 
 const toast = Object.assign(() => {}, {
   success() {},
@@ -270,7 +274,24 @@ export const uiDependencies = {
         .filter(Boolean)
         .join(" "),
   },
-  "@/lib/launcher": { launcherForeground: () => "#ffffff" },
+  "@/lib/launcher": {
+    launcherForeground: () => "#ffffff",
+    launcherStyleOptions: [
+      {
+        value: "bubble",
+        label: "Classic bubble",
+        description: "Balanced launcher",
+      },
+    ],
+  },
+  "@/components/widget/launcher-preview": {
+    LauncherPreview: ({ style, label }) =>
+      React.createElement(
+        "span",
+        { "data-launcher-style": style },
+        `launcher:${label}`,
+      ),
+  },
   "@/lib/clipboard": { copyText: async () => true },
   "@/lib/subscriptions": {
     formatPrice: (cents) => `?${(cents / 100).toFixed(2)}`,
@@ -309,6 +330,8 @@ export const uiDependencies = {
   },
   "./visitor-panel-shared": visitorPanelShared,
   "./visitor-insights-shared": visitorInsightsShared,
+  "./branding-fields": brandingFields,
+  "./branding-value": brandingValue,
   "./webhook-types": webhookTypes,
   "@/lib/admin-navigation": adminNavigation,
   "@/lib/visitor-env": {

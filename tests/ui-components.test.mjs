@@ -87,6 +87,15 @@ const { VisitorBreakdown } = loadUiModule(
 const { VisitorSitesTable } = loadUiModule(
   "src/components/admin/visitor-sites-table.tsx",
 );
+const { BrandingStylePicker } = loadUiModule(
+  "src/components/admin/branding-style-picker.tsx",
+);
+const { BrandingSettingFields } = loadUiModule(
+  "src/components/admin/branding-setting-fields.tsx",
+);
+const { BrandingPreview } = loadUiModule(
+  "src/components/admin/branding-preview.tsx",
+);
 
 const noop = () => {};
 
@@ -399,6 +408,53 @@ test("visitor insights split components render metrics, trend and breakdowns", (
   });
   assert.match(sites, /Demo Site/);
   assert.match(sites, /\/console-test\/visitors\?siteId=site-1/);
+});
+
+test("branding split components render style controls, fields and preview", () => {
+  const settings = {
+    title: "Product Chat",
+    logoUrl: "",
+    footerText: "Powered by Demo",
+    primaryColor: "#336699",
+    position: "right",
+    launcherStyle: "pill",
+    launcherLabel: "Chat with us",
+    imagesEnabled: true,
+    filesEnabled: false,
+    emojiEnabled: true,
+    ratingEnabled: true,
+    maxUploadMB: 8,
+  };
+  const value = {
+    title: "Product Chat",
+    launcherStyle: "pill",
+    primaryColor: "#336699",
+  };
+
+  const styles = renderUi(BrandingStylePicker, {
+    value,
+    settings,
+    onChange: noop,
+  });
+  assert.match(styles, /\u60ac\u6d6e\u6309\u94ae\u6837\u5f0f/);
+  assert.match(styles, /Classic bubble/);
+  assert.match(styles, /Balanced launcher/);
+
+  const fields = renderUi(BrandingSettingFields, {
+    value,
+    settings,
+    canCustomizeFooter: false,
+    onChange: noop,
+  });
+  assert.match(fields, /\u804a\u5929\u7a97\u53e3\u6807\u9898/);
+  assert.match(fields, /\u5e95\u90e8\u54c1\u724c\u6587\u5b57/);
+  assert.match(fields, /\u5df2\u5f00\u542f/);
+
+  const preview = renderUi(BrandingPreview, { settings, mobile: true });
+  assert.match(preview, /Product Chat/);
+  assert.match(preview, /Powered by Demo/);
+  assert.match(preview, /max-w-\[280px\]/);
+  assert.match(preview, /launcher:Chat with us/);
 });
 
 test("WeChat login split components render status, actions and config", () => {
