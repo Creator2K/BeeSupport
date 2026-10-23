@@ -1,0 +1,3 @@
+ALTER TABLE "Site" ADD COLUMN "imageReviewEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Visitor" ADD COLUMN "pendingImageId" TEXT;
+ALTER TABLE "Attachment" ADD COLUMN "imageReviewState" TEXT NOT NULL DEFAULT 'NONE';

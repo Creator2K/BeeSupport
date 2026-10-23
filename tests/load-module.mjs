@@ -1,0 +1,64 @@
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { z } from "zod";
+
+const require = createRequire(import.meta.url);
+const ts = require("typescript");
+
+/** Execute the real service code with explicit IO doubles; no database or network access. */
+export function loadModule(filename, dependencies = {}) {
+  const file = resolve(filename);
+  const output = ts.transpileModule(readFileSync(file, "utf8"), {
+    fileName: file,
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  const module = { exports: {} };
+  const dependency = (name) => {
+    if (Object.hasOwn(dependencies, name)) return dependencies[name];
+    if (name.startsWith("node:")) return require(name);
+    throw new Error(`Unexpected dependency ${name} in ${filename}`);
+  };
+  new Function("require", "module", "exports", output)(
+    dependency,
+    module,
+    module.exports,
+  );
+  return module.exports;
+}
+
+export class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export const auth = {
+  HttpError,
+  canAccessSite: (user, siteId) =>
+    user.siteIds === null || user.siteIds.includes(siteId),
+};
+
+export const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
+
+export const entitlements = loadModule("src/lib/entitlements.ts", {
+  zod: { z },
+});
+const tenantPolicy = loadModule("src/server/services/tenants.ts", {
+  "../../lib/entitlements": entitlements,
+  "../../lib/auth": auth,
+  "../../lib/db": { prisma: {} },
+  "../../lib/branding": {},
+  "../../lib/env": { env: { UPLOAD_MAX_BYTES: 10485760 } },
+});
+export const tenants = {
+  tenantCanServe: tenantPolicy.tenantCanServe,
+  getWidgetSettings: async () => ({ imagesEnabled: true, filesEnabled: true }),
+  assertTenantQuota: async () => {},
+  assertSiteServing: async () => {},
+};

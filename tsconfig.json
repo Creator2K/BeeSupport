@@ -1,0 +1,76 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.mts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next-account-access-release-v2/types/**/*.ts",
+    ".next-account-access-release/types/**/*.ts",
+    ".next-analytics-images/types/**/*.ts",
+    ".next-auto-followups-release/types/**/*.ts",
+    ".next-canned-release/types/**/*.ts",
+    ".next-collection-release-v2/types/**/*.ts",
+    ".next-collection-release/types/**/*.ts",
+    ".next-deliveries-release/types/**/*.ts",
+    ".next-demo-navigation-v2/types/**/*.ts",
+    ".next-demo-navigation/types/**/*.ts",
+    ".next-features/types/**/*.ts",
+    ".next-followups-release-v2/types/**/*.ts",
+    ".next-followups-release/types/**/*.ts",
+    ".next-growth-dev/types/**/*.ts",
+    ".next-growth-release-v2/types/**/*.ts",
+    ".next-growth-release/types/**/*.ts",
+    ".next-home-launchers-v2/types/**/*.ts",
+    ".next-home-launchers-v3/types/**/*.ts",
+    ".next-home-launchers/types/**/*.ts",
+    ".next-hosted-final/types/**/*.ts",
+    ".next-hosted-merchants/types/**/*.ts",
+    ".next-operations-dev/types/**/*.ts",
+    ".next-operations-release-v2/types/**/*.ts",
+    ".next-operations-release/types/**/*.ts",
+    ".next-prod/types/**/*.ts",
+    ".next-release-features-v2/types/**/*.ts",
+    ".next-release-features/types/**/*.ts",
+    ".next-reporting-release/types/**/*.ts",
+    ".next-review/types/**/*.ts",
+    ".next-service/types/**/*.ts",
+    ".next-subscriptions/types/**/*.ts",
+    ".next-unanswered-release/types/**/*.ts",
+    ".next-verify/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-efficiency-release/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

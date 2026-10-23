@@ -1,0 +1,293 @@
+import type { Prisma } from "@prisma/client";
+import { HttpError, type SessionUser } from "../../lib/auth";
+import { prisma } from "../../lib/db";
+import {
+  cannedInputSchema,
+  cannedSearchSchema,
+  cannedKeyword,
+  type CannedInput,
+  type CannedSearch,
+} from "../../lib/canned";
+
+function manager(actor: SessionUser) {
+  if (
+    !actor.tenantId ||
+    (actor.role !== "ADMIN" && actor.role !== "MERCHANT_ADMIN")
+  )
+    throw new HttpError(403, "仅管理员可管理话术");
+}
+function visible(actor: SessionUser): Prisma.CannedResponseWhereInput {
+  if (!actor.tenantId) throw new HttpError(403, "账号归属无效");
+  return {
+    ...(actor.role === "ADMIN" ? {} : { tenantId: actor.tenantId }),
+    OR: [{ shared: true }, { ownerId: actor.id }],
+  };
+}
+function searchWhere(
+  input: ReturnType<typeof cannedSearchSchema.parse>,
+): Prisma.CannedResponseWhereInput {
+  const keyword = cannedKeyword(input.query);
+  return {
+    AND: [
+      input.category ? { category: input.category } : {},
+      input.visibility ? { shared: input.visibility === "shared" } : {},
+      keyword
+        ? {
+            OR: ["title", "content", "shortcut", "category"].map((key) => ({
+              [key]: { contains: keyword, mode: "insensitive" },
+            })),
+          }
+        : {},
+    ],
+  };
+}
+const itemSelect = {
+  id: true,
+  title: true,
+  content: true,
+  shortcut: true,
+  category: true,
+  siteId: true,
+  usageCount: true,
+  shared: true,
+} satisfies Prisma.CannedResponseSelect;
+
+/** Site context supplies the tenant, including when platform staff are assisting another merchant. */
+async function servingScope(
+  actor: SessionUser,
+  siteId?: string,
+  db = prisma,
+): Promise<Prisma.CannedResponseWhereInput> {
+  visible(actor);
+  if (siteId) {
+    const site = await db.site.findFirst({
+      where: {
+        id: siteId,
+        ...(actor.role === "ADMIN" ? {} : { tenantId: actor.tenantId }),
+        ...(actor.siteIds === null
+          ? {}
+          : { id: { in: actor.siteIds, equals: siteId } }),
+      },
+      select: { tenantId: true },
+    });
+    if (!site) throw new HttpError(403, "无权使用该站点的话术");
+    return {
+      AND: [
+        visible(actor),
+        { tenantId: site.tenantId },
+        { OR: [{ siteId: null }, { siteId }] },
+      ],
+    };
+  }
+  return {
+    AND: [
+      visible(actor),
+      { tenantId: actor.tenantId },
+      actor.siteIds === null
+        ? {}
+        : { OR: [{ siteId: null }, { siteId: { in: actor.siteIds } }] },
+    ],
+  };
+}
+
+export async function listCannedForAgent(
+  actor: SessionUser,
+  input: CannedSearch = {},
+) {
+  const data = cannedSearchSchema.parse(input);
+  const scope = await servingScope(actor, data.siteId);
+  const where = { AND: [scope, searchWhere(data)] };
+  const [records, categories] = await Promise.all([
+    prisma.cannedResponse.findMany({
+      where,
+      select: itemSelect,
+      orderBy: [{ usageCount: "desc" }, { title: "asc" }, { id: "asc" }],
+      take: 51,
+    }),
+    prisma.cannedResponse.findMany({
+      where: { AND: [scope, { category: { not: "" } }] },
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" },
+    }),
+  ]);
+  return {
+    items: records.slice(0, 50),
+    categories: categories.map((row) => row.category),
+    hasMore: records.length > 50,
+  };
+}
+
+export async function recordCannedUse(
+  actor: SessionUser,
+  id: string,
+  siteId: string,
+) {
+  const scope = await servingScope(actor, siteId);
+  return prisma.$transaction(async (tx) => {
+    const where = { AND: [scope, { id }] };
+    const item = await tx.cannedResponse.findFirst({
+      where,
+      select: itemSelect,
+    });
+    if (!item) throw new HttpError(404, "话术已删除或不可用，请重新选择");
+    const updated = await tx.cannedResponse.updateMany({
+      where,
+      data: { usageCount: { increment: 1 } },
+    });
+    if (!updated.count)
+      throw new HttpError(404, "话术已删除或不可用，请重新选择");
+    return item;
+  });
+}
+
+export async function listManagedCanned(
+  actor: SessionUser,
+  input: CannedSearch = {},
+  requestedPage = 1,
+) {
+  manager(actor);
+  const data = cannedSearchSchema.parse(input);
+  const scope = visible(actor);
+  const where: Prisma.CannedResponseWhereInput = {
+    AND: [scope, searchWhere(data), data.siteId ? { siteId: data.siteId } : {}],
+  };
+  const pageSize = 20;
+  return prisma.$transaction(async (tx) => {
+    const total = await tx.cannedResponse.count({ where });
+    const page = Math.min(
+      Math.max(1, Math.floor(Number(requestedPage) || 1)),
+      Math.max(1, Math.ceil(total / pageSize)),
+    );
+    const [items, categories] = await Promise.all([
+      tx.cannedResponse.findMany({
+        where,
+        orderBy: [{ category: "asc" }, { title: "asc" }, { id: "asc" }],
+        take: pageSize,
+        skip: (page - 1) * pageSize,
+        select: {
+          ...itemSelect,
+          site: { select: { name: true } },
+          owner: { select: { name: true } },
+          tenant: { select: { name: true } },
+        },
+      }),
+      tx.cannedResponse.findMany({
+        where: { AND: [scope, { category: { not: "" } }] },
+        distinct: ["category"],
+        select: { category: true },
+        orderBy: { category: "asc" },
+      }),
+    ]);
+    return {
+      items,
+      categories: categories.map((row) => row.category),
+      total,
+      page,
+      pageSize,
+    };
+  });
+}
+
+export async function saveCannedReply(
+  actor: SessionUser,
+  input: CannedInput,
+  id?: string,
+) {
+  manager(actor);
+  const data = cannedInputSchema.parse(input);
+  return prisma.$transaction(async (tx) => {
+    const existing = id
+      ? await tx.cannedResponse.findFirst({
+          where: { AND: [visible(actor), { id }] },
+          select: { tenantId: true },
+        })
+      : null;
+    if (id && !existing) throw new HttpError(404, "话术不存在或无权编辑");
+    const site = data.siteId
+      ? await tx.site.findUnique({
+          where: { id: data.siteId },
+          select: { tenantId: true },
+        })
+      : null;
+    if (data.siteId && !site) throw new HttpError(404, "站点不存在");
+    const tenantId = existing?.tenantId ?? site?.tenantId ?? actor.tenantId;
+    if (actor.role !== "ADMIN" && tenantId !== actor.tenantId)
+      throw new HttpError(403, "无权访问该商家");
+    if (site && site.tenantId !== tenantId)
+      throw new HttpError(403, "不能将话术移动到其他商家");
+    // Serialize shortcut checks with all management writes for this tenant.
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${tenantId} FOR UPDATE`;
+    if (
+      data.shortcut &&
+      (await tx.cannedResponse.findFirst({
+        where: {
+          tenantId,
+          siteId: data.siteId ?? null,
+          shortcut: { equals: data.shortcut, mode: "insensitive" },
+          ...(id ? { id: { not: id } } : {}),
+        },
+        select: { id: true },
+      }))
+    )
+      throw new HttpError(409, "该范围内的快捷码已存在，请更换");
+    const values = {
+      title: data.title,
+      content: data.content,
+      category: data.category,
+      shortcut: data.shortcut || null,
+      siteId: data.siteId ?? null,
+      shared: data.shared,
+    };
+    let item;
+    if (id) {
+      const updated = await tx.cannedResponse.updateMany({
+        where: { AND: [visible(actor), { id, tenantId }] },
+        data: values,
+      });
+      if (!updated.count) throw new HttpError(404, "话术不存在或无权编辑");
+      item = { id };
+    } else
+      item = await tx.cannedResponse.create({
+        data: { ...values, tenantId, ownerId: actor.id },
+        select: { id: true },
+      });
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: id ? "canned.update" : "canned.create",
+        targetType: "CannedResponse",
+        targetId: item.id,
+        meta: { category: data.category, shared: data.shared },
+      },
+    });
+    return item;
+  });
+}
+
+export async function deleteCannedReply(actor: SessionUser, id: string) {
+  manager(actor);
+  return prisma.$transaction(async (tx) => {
+    const where = { AND: [visible(actor), { id }] };
+    const item = await tx.cannedResponse.findFirst({
+      where,
+      select: { tenantId: true },
+    });
+    if (!item) throw new HttpError(404, "话术不存在或无权删除");
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${item.tenantId} FOR UPDATE`;
+    const deleted = await tx.cannedResponse.deleteMany({ where });
+    if (!deleted.count) throw new HttpError(404, "话术不存在或无权删除");
+    await tx.auditLog.create({
+      data: {
+        tenantId: item.tenantId,
+        actorId: actor.id,
+        actorName: actor.name,
+        action: "canned.delete",
+        targetType: "CannedResponse",
+        targetId: id,
+      },
+    });
+  });
+}

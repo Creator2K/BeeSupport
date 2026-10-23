@@ -1,0 +1,668 @@
+// BeeSupport —— 多站点统一客服系统
+// Prisma schema（PostgreSQL）
+//
+// 设计要点：
+// - Tenant = 商家；Site/客服/共享配置属于商家，通过 SiteAgent 做客服站点授权
+// - Visitor 以「站点 + 浏览器本地标识」唯一，邮箱为发起会话的必填项
+// - Conversation 的未读数、首次响应时间、评价都落在会话上，便于统计
+// - Attachment 单独建表，便于统一走鉴权下载与后续切换对象存储
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Transactional notification outbox. Each destination retries independently.
+model NotificationJob {
+  id          String   @id @default(cuid())
+  kind        String
+  payload     Json
+  status      String   @default("PENDING")
+  attempts    Int      @default(0)
+  totalAttempts Int    @default(0)
+  manualRetries Int    @default(0)
+  outcome String? // SUCCESS | SKIPPED; null for historical results or unfinished jobs
+  availableAt DateTime @default(now())
+  lockedUntil DateTime?
+  leaseToken  String?
+  lastError   String?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([status, availableAt])
+  @@index([status, lockedUntil])
+  @@index([createdAt, id])
+  @@index([kind, status, createdAt])
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MERCHANT_ADMIN
+  AGENT
+}
+
+enum AgentStatus {
+  ONLINE
+  AWAY
+  OFFLINE
+}
+
+enum ConversationStatus {
+  PENDING // 待接入（排队中）
+  OPEN // 进行中
+  CLOSED // 已结束
+}
+
+enum ConversationSource {
+  WIDGET // 访客主动发起
+  OFFLINE_FORM // 客服不在线时的离线留言
+}
+
+enum MessageSender {
+  VISITOR
+  AGENT
+  SYSTEM
+  AI // AI 助手自动回复
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+  NOTE // 客服内部备注，访客不可见
+}
+
+enum UploaderType {
+  VISITOR
+  AGENT
+}
+
+enum WebhookType {
+  GENERIC
+  TELEGRAM
+  DINGTALK
+  WECHAT_WORK
+  WECHAT // 个人微信，通过外部 wechatbot 桥接服务
+  WECHAT_BOT // 个人微信，后端进程内扫码登录（内置）
+}
+
+model Tenant {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  status String @default("ACTIVE") // PENDING | ACTIVE | SUSPENDED
+  planName String @default("基础版")
+  managementVersion Int @default(0)
+  features Json @default("{}")
+  expiresAt DateTime?
+  maxAgents Int @default(5)
+  maxSites Int @default(3)
+  monthlyConversations Int @default(3000)
+  storageMB Int @default(1024)
+  defaults Json @default("{}")
+  contactEmail String?
+  note String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users User[]
+  sites Site[]
+  cannedResponses CannedResponse[]
+  knowledge AiKnowledge[]
+  webhooks WebhookEndpoint[]
+  riskRules RiskRule[]
+  auditLogs AuditLog[]
+  subscriptionOrders SubscriptionOrder[]
+  accountNotices AccountNotice[]
+  accountTokens AccountToken[]
+  followUps FollowUp[]
+  @@index([status, expiresAt])
+  unansweredReminders UnansweredReminder[]
+}
+
+model User {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  role         Role        @default(AGENT)
+  avatarUrl    String?
+  active       Boolean     @default(true)
+  status       AgentStatus @default(OFFLINE)
+  locale       String      @default("zh-CN")
+  // 客服个人偏好：提示音、音量、桌面通知等
+  preferences  Json?
+  lastSeenAt   DateTime?
+  // 改密码 / 禁用账号时自增，使已签发的 JWT 立即失效
+  tokenVersion Int         @default(0)
+  // Only self-service registrations made while verification is enabled are gated.
+  emailVerificationRequired Boolean @default(false)
+  emailVerifiedAt DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sites          SiteAgent[]
+  conversations  Conversation[]  @relation("assignedAgent")
+  messages       Message[]
+  cannedResponses CannedResponse[]
+  auditLogs      AuditLog[]
+  accountNotices AccountNotice[]
+  accountTokens AccountToken[]
+  followUps FollowUp[]
+  ownedFollowUpRules FollowUpRule[]
+  ownedUnansweredRules UnansweredRule[]
+  unansweredReminders UnansweredReminder[]
+
+  @@index([role, active])
+}
+
+// Reset/verification credentials and invitations. Only a digest is stored here.
+model AccountToken {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId String?
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose String // RESET | VERIFY | INVITE
+  tokenHash String @unique
+  email String
+  tokenVersion Int?
+  inviterId String?
+  role Role @default(AGENT)
+  siteIds String[] @default([])
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, purpose, createdAt])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+model Site {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  publicKey   String   @unique @default(cuid())
+  description String?
+  active      Boolean  @default(true)
+
+  widgetSettings Json @default("{}")
+  embedSeenAt DateTime?
+  embedOrigin String?
+
+  // 访客端外观与文案
+  primaryColor    String  @default("#18181b")
+  position        String  @default("right") // right | left
+  welcomeMessage  String  @default("你好！有什么可以帮你的吗？")
+  offlineMessage  String  @default("当前客服不在线，请留下你的邮箱和问题，我们会尽快回复。")
+  requireEmail    Boolean @default(true)
+  notifyEmail     String?
+  // 新会话自动分配给在线客服；关闭后进入排队，由客服手动接入
+  autoAssign      Boolean @default(true)
+  imageReviewEnabled Boolean @default(false)
+
+  // 允许嵌入的域名白名单，空数组表示不限制（便于内网/预发联调）
+  allowedOrigins String[] @default([])
+
+  // 客服工作时间：{ enabled, timezone, days: { "1": [["09:00","18:00"]], ... } }
+  workHours Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agents       SiteAgent[]
+  visitors     Visitor[]
+  conversations Conversation[]
+  attachments  Attachment[]
+  cannedResponses CannedResponse[]
+  webhooks     WebhookEndpoint[]
+  knowledge    AiKnowledge[]
+  riskRules    RiskRule[]
+  riskEvents   RiskEvent[]
+  followUpRule FollowUpRule?
+  unansweredRule UnansweredRule?
+
+  @@index([active])
+}
+
+// Internal site automation; never included in public widget settings.
+model FollowUpRule {
+  id String @id @default(cuid())
+  siteId String @unique
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  enabled Boolean @default(false)
+  ownerId String?
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  delayMinutes Int @default(60)
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([ownerId])
+}
+
+model UnansweredRule {
+  id String @id @default(cuid())
+  siteId String @unique
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  enabled Boolean @default(false)
+  enabledAt DateTime?
+  ownerId String?
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  recipientMode String @default("ASSIGNED_OR_OWNER")
+  delayMinutes Int @default(10)
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reminders UnansweredReminder[]
+  @@index([ownerId])
+}
+
+// AI 知识库：命中关键词的条目会作为上下文拼进系统提示词
+model AiKnowledge {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  keywords  String[] @default([])
+  enabled   Boolean  @default(true)
+  siteId    String? // null = 全部站点
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site   Site?             @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  chunks AiKnowledgeChunk[]
+
+  @@index([siteId, enabled])
+}
+
+// 知识库切片：RAG 检索的最小单位，可选带向量（embedding）
+model AiKnowledgeChunk {
+  id            String    @id @default(cuid())
+  knowledgeId   String
+  index         Int
+  content       String
+  // 向量：没启用 embedding 时为空数组，检索退化为关键词打分
+  embedding     Float[]   @default([])
+  embeddingModel String?
+  updatedAt     DateTime  @updatedAt
+
+  knowledge AiKnowledge @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeId])
+}
+
+// 客服与站点的授权关系（ADMIN 为平台管理员，MERCHANT_ADMIN 可见所属商家全部站点）
+model SiteAgent {
+  userId String
+  siteId String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, siteId])
+  @@index([siteId])
+}
+
+model Visitor {
+  id     String  @id @default(cuid())
+  siteId String
+  // 浏览器本地生成的匿名标识，用于二次访问认人
+  localKey String
+  email    String
+  name     String?
+  meta     Json?
+  blocked  Boolean @default(false)
+  profileTags String[] @default([])
+  profileNote String?
+  pendingImageId String?
+
+  // 访问轨迹
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  visitCount    Int      @default(1) // 打开过页面的次数
+  pageViews     Int      @default(1) // 浏览过的不同页面数
+  landingPage   String? // 首次进入的页面
+  lastPage      String?
+  lastPageTitle String?
+  referrer      String?
+
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([siteId, localKey])
+  @@index([siteId, email])
+  @@index([siteId, lastSeenAt])
+}
+
+model Conversation {
+  id       String               @id @default(cuid())
+  siteId   String
+  visitorId String
+  assignedAgentId String?
+  status   ConversationStatus   @default(PENDING)
+  source   ConversationSource   @default(WIDGET)
+
+  subject  String?
+  tags     String[]             @default([])
+  note     String? // 客服内部备注
+  priority Int                  @default(0)
+
+  lastMessageAt      DateTime @default(now())
+  lastMessagePreview String?
+  unreadForAgent     Int      @default(0)
+  unreadForVisitor   Int      @default(0)
+
+  firstResponseAt DateTime? // 首次客服响应时间，用于统计
+  waitingSince DateTime? // First visitor message in the current unanswered round.
+  waitingMessageId String?
+  rating          Int?
+  ratingComment   String?
+  ratedAt         DateTime?
+
+  closedAt   DateTime?
+  closedById String?
+  // Cross-instance lease for one automatic AI generation at a time.
+  aiReplyToken String?
+  aiReplyExpiresAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  site          Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  visitor       Visitor    @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  assignedAgent User?      @relation("assignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  followUp      FollowUp?
+  unansweredReminders UnansweredReminder[]
+
+  @@index([siteId, status, lastMessageAt])
+  @@index([assignedAgentId, status])
+  @@index([visitorId, createdAt])
+  @@index([waitingSince, id])
+  @@index([createdAt, siteId])
+}
+
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  sender         MessageSender
+  type           MessageType   @default(TEXT)
+  body           String        @default("")
+  authorId       String? // 客服消息的作者
+  authorName     String? // 昵称快照（访客侧展示）
+  clientId       String? // 客户端去重
+  // 附加信息：AI 模型、工具调用轨迹、知识库命中等等
+  meta           Json?
+  readByVisitorAt DateTime?
+  readByAgentAt   DateTime?
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  attachments  Attachment[]
+
+  @@index([conversationId, createdAt])
+  @@unique([conversationId, clientId])
+}
+
+model Attachment {
+  id         String       @id @default(cuid())
+  siteId     String
+  messageId  String?
+  uploader   UploaderType
+  uploaderId String?
+  filename   String
+  mimeType   String
+  size       Int
+  storageKey String // 相对存储根目录的路径
+  imageReviewState String @default("NONE") // NONE | PENDING | APPROVED | RELEASED
+  createdAt  DateTime     @default(now())
+
+  site    Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
+  @@index([siteId, createdAt])
+}
+
+model CannedResponse {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  shortcut  String? // 快捷码，如 /price
+  category String @default("")
+  siteId    String? // null = 全局话术
+  ownerId   String? // null = 团队共享
+  shared    Boolean  @default(true)
+  usageCount Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site  Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([siteId])
+  @@index([shortcut])
+  @@index([tenantId, category])
+}
+
+model WebhookEndpoint {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id        String      @id @default(cuid())
+  name      String
+  type      WebhookType @default(GENERIC)
+  url       String
+  secret    String?
+  // 订阅事件：conversation.created / conversation.offline / message.created / conversation.assigned
+  events    String[]    @default([])
+  siteId    String? // null = 所有站点
+  active    Boolean     @default(true)
+  lastStatus    String?
+  lastTriggeredAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([active])
+}
+
+// 全局设置（SMTP 、站点默认值等），单行 KV
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AccountNotice {
+  id String @id @default(cuid())
+  tenantId String
+  userId String
+  kind String
+  dedupeKey String
+  title String
+  body String
+  expirySnapshot DateTime?
+  readAt DateTime?
+  mailJobId String?
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, dedupeKey])
+  @@index([tenantId, userId, createdAt])
+}
+
+model AuditLog {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorName  String?
+  action     String
+  targetType String?
+  targetId   String?
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model RiskRule {
+  tenantId String @default("legacy")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@index([tenantId])
+  id        String   @id @default(cuid())
+  kind      String
+  value     String
+  note      String?
+  siteId    String?
+  active    Boolean  @default(true)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  site      Site?    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([kind, active, siteId])
+}
+
+model RiskEvent {
+  id        String   @id @default(cuid())
+  kind      String
+  ruleId    String?
+  ruleValue String
+  siteId    String?
+  visitorId String?
+  ip        String
+  context   String
+  createdAt DateTime @default(now())
+  site      Site?    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, createdAt])
+  @@index([createdAt])
+}
+
+
+// Published offers are copied into immutable order snapshots at submission time.
+model SubscriptionPlan {
+  id String @id @default(cuid())
+  name String
+  description String @default("")
+  features Json @default("{}")
+  priceCents Int
+  durationDays Int
+  maxAgents Int
+  maxSites Int
+  monthlyConversations Int
+  storageMB Int
+  active Boolean @default(false)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders SubscriptionOrder[]
+  @@index([active, sortOrder])
+}
+
+model SubscriptionOrder {
+  id String @id @default(cuid())
+  orderNo String @unique
+  tenantId String
+  planId String
+  clientRequestId String
+  status String @default("PENDING") // PENDING | CONFIRMED | REJECTED | CANCELLED | EXPIRED
+  planName String
+  features Json @default("{}")
+  priceCents Int
+  durationDays Int
+  maxAgents Int
+  maxSites Int
+  monthlyConversations Int
+  storageMB Int
+  requestedById String?
+  requestedByName String
+  merchantNote String @default("")
+  reviewedById String?
+  reviewedByName String?
+  reviewNote String @default("")
+  paymentReference String @default("") // platform-only
+  paymentReportedAt DateTime?
+  paymentNote String @default("") // merchant-reported; never evidence of settled funds
+  paymentReportVersion Int @default(0)
+  validUntil DateTime
+  reviewedAt DateTime?
+  periodStart DateTime?
+  periodEnd DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, clientRequestId])
+  @@index([tenantId, createdAt])
+  @@index([status, createdAt])
+  // A partial SQL unique index also permits only one PENDING order per tenant.
+}
+
+model UnansweredReminder {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  recipientId String?
+  recipient User? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  ruleId String?
+  rule UnansweredRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleVersion Int
+  waitingMessageId String
+  waitingSince DateTime
+  remindedAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolution String?
+  @@unique([conversationId, waitingMessageId])
+  @@index([tenantId, resolvedAt, remindedAt])
+  @@index([recipientId, resolvedAt, remindedAt])
+  @@index([ruleId])
+}
+
+model FollowUp {
+  id String @id @default(cuid())
+  tenantId String
+  conversationId String @unique
+  ownerId String?
+  note String
+  dueAt DateTime
+  status String @default("OPEN")
+  version Int @default(1)
+  finishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  @@index([tenantId, status, dueAt])
+  @@index([ownerId, status, dueAt])
+}
