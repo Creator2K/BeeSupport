@@ -416,6 +416,18 @@ export const uiDependencies = {
     }),
   },
   "./visitor-panel-shared": visitorPanelShared,
+  "./message-bubble": {
+    MessageBubble: ({ message }) =>
+      React.createElement("p", null, message.body),
+  },
+  "./ai-suggestion-panel": {
+    AiSuggestionPanel: ({ text }) =>
+      React.createElement("div", null, `ai-suggestion:${text}`),
+  },
+  "./canned-reply-picker": {
+    CannedReplyPicker: () =>
+      React.createElement("button", null, "canned-picker"),
+  },
   "./visitor-insights-shared": visitorInsightsShared,
   "./branding-fields": brandingFields,
   "./branding-value": brandingValue,

@@ -29,7 +29,7 @@ export function AiSuggestionPanel({
         {t("workbench.aiSuggest")}
         {trace?.model ? (
           <span className="font-normal normal-case opacity-70">
-            ? {trace.model}
+            · {trace.model}
           </span>
         ) : null}
       </div>
@@ -39,12 +39,14 @@ export function AiSuggestionPanel({
         <div className="text-muted-foreground mt-1.5 space-y-0.5 text-[10px] leading-relaxed">
           {trace.tools.map((tool, index) => (
             <div key={`${tool.name}-${index}`}>
-              {t("workbench.aiTools")} ? {tool.name} ? {tool.summary}
+              {t("workbench.aiTools")} · {tool.name} —{" "}
+              {tool.summary}
             </div>
           ))}
           {trace.knowledge.map((item, index) => (
             <div key={`${item.title}-${index}`}>
-              {t("workbench.aiKnowledge")} ? {item.title}?{item.score}?
+              {t("workbench.aiKnowledge")} · {item.title}（
+              {item.score}）
             </div>
           ))}
         </div>

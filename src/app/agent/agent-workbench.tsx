@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MessagesSquare, Paperclip, Send, Sparkles } from "lucide-react";
+import { MessagesSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useChatDrafts } from "@/lib/use-chat-drafts";
 import { clearAccountDrafts } from "@/lib/chat-drafts";
@@ -12,18 +12,7 @@ import {
   ConversationList,
   type WorkbenchFilters,
 } from "@/components/agent/conversation-list";
-import { MessageBubble } from "@/components/agent/message-bubble";
 import { VisitorPanel } from "@/components/agent/visitor-panel";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { EmojiPicker } from "@/components/emoji-picker";
 import {
   bindAudioUnlock,
   playSound,
@@ -54,8 +43,6 @@ import { listTransferTargetsAction } from "@/server/actions/agents";
 import { savePreferencesAction } from "@/server/actions/preferences";
 import { cn } from "@/lib/utils";
 import { appendCannedText } from "@/lib/canned";
-import { AiSuggestionPanel } from "@/components/agent/ai-suggestion-panel";
-import { CannedReplyPicker } from "@/components/agent/canned-reply-picker";
 import { ConversationHeader } from "@/components/agent/conversation-header";
 import type {
   AiSuggestionTrace,
@@ -65,6 +52,8 @@ import type {
 } from "@/components/agent/workbench-types";
 import { WorkbenchDialogs } from "@/components/agent/workbench-dialogs";
 import { WorkbenchHeader } from "@/components/agent/workbench-header";
+import { WorkbenchComposer } from "@/components/agent/workbench-composer";
+import { WorkbenchMessageThread } from "@/components/agent/workbench-message-thread";
 
 export type { WorkbenchMe } from "@/components/agent/workbench-types";
 
@@ -808,6 +797,14 @@ export function AgentWorkbench({
     socket.emit("typing", { conversationId: activeId, isTyping });
   }
 
+  function noteTypingActivity() {
+    emitTyping(true);
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+    }
+    typingStopTimerRef.current = setTimeout(() => emitTyping(false), 2500);
+  }
+
   async function sendMessage() {
     const body = draft.trim();
     if (!body || !activeId || sendingRef.current) return;
@@ -1182,249 +1179,66 @@ export function AgentWorkbench({
                 onRequestClose={() => setCloseConfirmOpen(true)}
               />
 
-              <div
-                ref={scrollRef}
+              <WorkbenchMessageThread
+                conversation={activeConversation}
+                messages={activeMessages}
+                loading={loadingMessages}
+                hasOlder={Boolean(activeId && hasOlderMessages[activeId])}
+                loadingOlder={loadingOlder}
+                locale={locale}
+                scrollRef={scrollRef}
                 onScroll={onScroll}
-                className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
-              >
-                {loadingMessages && activeMessages.length === 0 ? (
-                  <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
-                    <Loader2 className="size-4 animate-spin" />
-                    {t("common.loading")}
-                  </div>
-                ) : null}
+                onLoadOlder={() => void loadOlderMessages()}
+              />
 
-                {activeConversation.status === "CLOSED" ? (
-                  <div className="flex justify-center">
-                    <span className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-[11px]">
-                      {t("workbench.closedBanner")}
-                    </span>
-                  </div>
-                ) : null}
-
-                {activeId && hasOlderMessages[activeId] ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    disabled={loadingOlder}
-                    onClick={() => void loadOlderMessages()}
-                  >
-                    {t(loadingOlder ? "common.loading" : "common.loadOlder")}
-                  </Button>
-                ) : null}
-                {activeMessages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    mine={message.sender === "AGENT"}
-                    locale={locale}
-                    receiptAt={message.readByVisitorAt}
-                    showAiTrace
-                    allowImageApproval
-                    labels={{
-                      read: t("workbench.readStatus"),
-                      delivered: t("workbench.delivered"),
-                      system: t("workbench.systemMessage"),
-                      note: t("workbench.internalNote"),
-                      ai: t("workbench.aiLabel"),
-                      tools: t("workbench.aiTools"),
-                      knowledge: t("workbench.aiKnowledge"),
-                    }}
-                  />
-                ))}
-              </div>
-
-              <div className="shrink-0 border-t p-3">
-                {newMessagesBelow ? (
-                  <Button
-                    className="mb-2 w-full"
-                    variant="secondary"
-                    size="sm"
-                    onClick={scrollToLatest}
-                  >
-                    {t("common.newMessages")}
-                  </Button>
-                ) : null}
-                {aiSuggestion ? (
-                  <AiSuggestionPanel
-                    text={aiSuggestion}
-                    trace={aiTrace}
-                    onUse={() => {
-                      setDraft((prev) =>
-                        prev ? `${prev}\n${aiSuggestion}` : aiSuggestion,
-                      );
-                      setSuggestion(null);
-                      setAiTrace(null);
-                    }}
-                    onDismiss={() => {
-                      setSuggestion(null);
-                      setAiTrace(null);
-                    }}
-                  />
-                ) : null}
-
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <Textarea
-                    ref={composerRef}
-                    disabled={!draftsReady}
-                    maxLength={5000}
-                    value={draft}
-                    rows={2}
-                    placeholder={t("workbench.sendPlaceholder")}
-                    className="max-h-40 min-h-9 flex-1 resize-none text-sm"
-                    onChange={(event) => {
-                      setDraft(event.target.value);
-                      emitTyping(true);
-                      if (typingStopTimerRef.current) {
-                        clearTimeout(typingStopTimerRef.current);
-                      }
-                      typingStopTimerRef.current = setTimeout(
-                        () => emitTyping(false),
-                        2500,
-                      );
-                    }}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" &&
-                        !event.shiftKey &&
-                        !event.nativeEvent.isComposing &&
-                        event.nativeEvent.keyCode !== 229
-                      ) {
-                        event.preventDefault();
-                        void sendMessage();
-                      }
-                      if (
-                        event.key === "/" &&
-                        !draft &&
-                        !event.nativeEvent.isComposing
-                      ) {
-                        event.preventDefault();
-                        setCannedQuery("");
-                        setCannedCategory("");
-                        changeCannedOpen(true);
-                      }
-                    }}
-                    onPaste={(event) => void handlePaste(event)}
-                  />
-
-                  <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
-                    <EmojiPicker
-                      textareaRef={composerRef}
-                      value={draft}
-                      onChange={setDraft}
-                      disabled={sending}
-                    />
-                    {ai.ready && aiModelOptions.length > 1 ? (
-                      <Select
-                        value={activeAiModel}
-                        onValueChange={(value) =>
-                          updatePreferences({ preferredModel: value })
-                        }
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          className="h-8 w-[128px] text-[11px]"
-                          title={t("workbench.aiModel")}
-                        >
-                          <SelectValue placeholder={t("workbench.aiModel")} />
-                        </SelectTrigger>
-                        <SelectContent align="end" className="max-h-72">
-                          {aiModelOptions.map((model) => (
-                            <SelectItem
-                              key={model}
-                              value={model}
-                              className="text-xs"
-                            >
-                              {model}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : null}
-
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      title={t("workbench.aiSuggest")}
-                      disabled={aiLoading}
-                      onClick={() => void generateSuggestion()}
-                    >
-                      {aiLoading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-4" />
-                      )}
-                    </Button>
-
-                    <CannedReplyPicker
-                      open={cannedOpen}
-                      onOpenChange={changeCannedOpen}
-                      query={cannedQuery}
-                      onQueryChange={setCannedQuery}
-                      category={cannedCategory}
-                      onCategoryChange={setCannedCategory}
-                      categories={cannedCategories}
-                      loading={cannedLoading}
-                      error={Boolean(cannedResult.error)}
-                      items={filteredCanned}
-                      inserting={cannedInserting}
-                      hasMore={cannedResult.hasMore}
-                      onInsert={insertCanned}
-                    />
-
-                    <label
-                      className={cn(
-                        "inline-flex size-8 cursor-pointer items-center justify-center rounded-md border focus-within:ring-2 focus-within:ring-ring",
-                        uploading && "pointer-events-none opacity-50",
-                      )}
-                      title={t("workbench.attach")}
-                    >
-                      {uploading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Paperclip className="size-4" />
-                      )}
-                      <input
-                        type="file"
-                        className="sr-only"
-                        disabled={uploading}
-                        aria-label={t("workbench.attach")}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) void uploadFile(file);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-
-                    <Button
-                      size="icon-sm"
-                      disabled={!draft.trim() || sending}
-                      onClick={() => void sendMessage()}
-                      title={t("workbench.send")}
-                    >
-                      {sending ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Send className="size-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                  <span>{t("workbench.sendPlaceholder")}</span>
-                  <span className="hidden sm:inline">
-                    {t("widget.pasteHint")}
-                  </span>
-                  {draft.length > 4000 ? (
-                    <span className="text-destructive">
-                      {draft.length}/5000
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+              <WorkbenchComposer
+                draft={draft}
+                draftsReady={draftsReady}
+                composerRef={composerRef}
+                sending={sending}
+                uploading={uploading}
+                aiLoading={aiLoading}
+                aiReady={ai.ready}
+                aiModelOptions={aiModelOptions}
+                activeAiModel={activeAiModel}
+                aiSuggestion={aiSuggestion}
+                aiTrace={aiTrace}
+                newMessagesBelow={newMessagesBelow}
+                cannedOpen={cannedOpen}
+                cannedQuery={cannedQuery}
+                cannedCategory={cannedCategory}
+                cannedCategories={cannedCategories}
+                cannedLoading={cannedLoading}
+                cannedError={Boolean(cannedResult.error)}
+                cannedItems={filteredCanned}
+                cannedInserting={cannedInserting}
+                cannedHasMore={cannedResult.hasMore}
+                onDraftChange={setDraft}
+                onTypingActivity={noteTypingActivity}
+                onScrollToLatest={scrollToLatest}
+                onUseSuggestion={() => {
+                  setDraft((previous) =>
+                    previous ? `${previous}\n${aiSuggestion ?? ""}` : (aiSuggestion ?? ""),
+                  );
+                  setSuggestion(null);
+                  setAiTrace(null);
+                }}
+                onDismissSuggestion={() => {
+                  setSuggestion(null);
+                  setAiTrace(null);
+                }}
+                onModelChange={(value) =>
+                  updatePreferences({ preferredModel: value })
+                }
+                onGenerateSuggestion={() => void generateSuggestion()}
+                onCannedOpenChange={changeCannedOpen}
+                onCannedQueryChange={setCannedQuery}
+                onCannedCategoryChange={setCannedCategory}
+                onInsertCanned={insertCanned}
+                onUploadFile={uploadFile}
+                onSend={() => void sendMessage()}
+                onPaste={(event) => void handlePaste(event)}
+              />
             </>
           )}
         </main>

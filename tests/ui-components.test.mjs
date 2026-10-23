@@ -19,6 +19,12 @@ const { AiSuggestionPanel } = loadUiModule(
 const { WorkbenchDialogs } = loadUiModule(
   "src/components/agent/workbench-dialogs.tsx",
 );
+const { WorkbenchMessageThread } = loadUiModule(
+  "src/components/agent/workbench-message-thread.tsx",
+);
+const { WorkbenchComposer } = loadUiModule(
+  "src/components/agent/workbench-composer.tsx",
+);
 const { WidgetHeader } = loadUiModule("src/components/widget/widget-header.tsx");
 const { WidgetIdentityForm } = loadUiModule(
   "src/components/widget/widget-identity-form.tsx",
@@ -218,6 +224,7 @@ test("agent workbench split components keep key actions and states", () => {
   assert.match(header, /workbench\.statusOnline/);
   assert.match(header, /common\.logout/);
 
+
   const conversation = {
     id: "conversation-1",
     siteId: "site-1",
@@ -231,6 +238,77 @@ test("agent workbench split components keep key actions and states", () => {
       lastSeenAt: new Date().toISOString(),
     },
   };
+  const messageThread = renderUi(WorkbenchMessageThread, {
+    conversation,
+    messages: [
+      {
+        id: "message-1",
+        conversationId: conversation.id,
+        sender: "VISITOR",
+        type: "TEXT",
+        body: "Hello from visitor",
+        authorId: null,
+        authorName: null,
+        createdAt: "2026-10-23T09:00:00.000Z",
+        readByAgentAt: null,
+        readByVisitorAt: null,
+        clientId: null,
+        attachments: [],
+        meta: null,
+      },
+    ],
+    loading: false,
+    hasOlder: true,
+    loadingOlder: false,
+    locale: "zh-CN",
+    scrollRef: React.createRef(),
+    onScroll: noop,
+    onLoadOlder: noop,
+  });
+  assert.match(messageThread, /Hello from visitor/);
+  assert.match(messageThread, /common\.loadOlder/);
+
+  const composer = renderUi(WorkbenchComposer, {
+    draft: "Draft reply",
+    draftsReady: true,
+    composerRef: React.createRef(),
+    sending: false,
+    uploading: false,
+    aiLoading: false,
+    aiReady: true,
+    aiModelOptions: ["model-a", "model-b"],
+    activeAiModel: "model-a",
+    aiSuggestion: "Suggested reply",
+    aiTrace: null,
+    newMessagesBelow: true,
+    cannedOpen: false,
+    cannedQuery: "",
+    cannedCategory: "",
+    cannedCategories: [],
+    cannedLoading: false,
+    cannedError: false,
+    cannedItems: [],
+    cannedInserting: false,
+    cannedHasMore: false,
+    onDraftChange: noop,
+    onTypingActivity: noop,
+    onScrollToLatest: noop,
+    onUseSuggestion: noop,
+    onDismissSuggestion: noop,
+    onModelChange: noop,
+    onGenerateSuggestion: noop,
+    onCannedOpenChange: noop,
+    onCannedQueryChange: noop,
+    onCannedCategoryChange: noop,
+    onInsertCanned: async () => {},
+    onUploadFile: async () => true,
+    onSend: noop,
+    onPaste: noop,
+  });
+  assert.match(composer, /workbench\.sendPlaceholder/);
+  assert.match(composer, /common\.newMessages/);
+  assert.match(composer, /ai-suggestion:Suggested reply/);
+  assert.match(composer, /canned-picker/);
   const conversationHeader = renderUi(ConversationHeader, {
     conversation,
     typingConversationId: null,
