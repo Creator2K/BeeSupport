@@ -51,6 +51,12 @@ const { WebhookList } = loadUiModule(
 const { WebhookFormDialog } = loadUiModule(
   "src/app/admin/webhooks/webhook-form-dialog.tsx",
 );
+const { AdminShellHeader } = loadUiModule(
+  "src/components/admin/admin-shell-header.tsx",
+);
+const { NavContent } = loadUiModule(
+  "src/components/admin/admin-nav-content.tsx",
+);
 
 const noop = () => {};
 
@@ -255,6 +261,59 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(rating, /widget\.closedByAgent/);
   assert.match(rating, /widget\.rateHint/);
   assert.match(rating, /widget\.startNew/);
+});
+
+test("admin shell header and navigation expose workspace routes", () => {
+  const groups = [
+    {
+      id: "overview",
+      label: "nav.workspace",
+      defaultOpen: true,
+      items: [
+        { path: "", label: "nav.overview", icon: "overview" },
+        {
+          path: "/merchants",
+          label: "nav.merchants",
+          icon: "merchants",
+          count: "merchants",
+        },
+      ],
+    },
+  ];
+  const user = {
+    id: "admin-1",
+    name: "Admin",
+    email: "admin@example.test",
+    role: "ADMIN",
+    counts: { merchants: 3 },
+  };
+  const navigation = renderUi(NavContent, {
+    user,
+    basePath: "/console-test",
+    groups,
+    closedGroups: {},
+    toggleGroup: noop,
+    collapsed: false,
+    onNavigate: noop,
+  });
+  assert.match(navigation, /nav\.platformConsole/);
+  assert.match(navigation, /nav\.overview/);
+  assert.match(navigation, /nav\.merchants/);
+  assert.match(navigation, /\/console-test\/merchants/);
+
+  const header = renderUi(AdminShellHeader, {
+    collapsed: false,
+    mobileOpen: false,
+    onMobileOpenChange: noop,
+    onToggleCollapsed: noop,
+    activeGroup: groups[0],
+    activeItem: groups[0].items[1],
+    mobileNav: React.createElement("span", null, "mobile-navigation"),
+  });
+  assert.match(header, /nav\.workspace/);
+  assert.match(header, /nav\.merchants/);
+  assert.match(header, /nav\.workbench/);
+  assert.match(header, /mobile-navigation/);
 });
 
 test("webhook list and form render channel controls", () => {

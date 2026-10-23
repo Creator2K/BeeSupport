@@ -87,6 +87,10 @@ const DropdownMenuContent = element("div");
 const DropdownMenuItem = element("button");
 const DropdownMenuLabel = element("div");
 const DropdownMenuSeparator = element("hr");
+const Sheet = element("div");
+const SheetTrigger = element("div");
+const SheetContent = element("div");
+const SheetTitle = element("h2");
 const Dialog = element("div");
 const DialogContent = element("div");
 const DialogHeader = element("div");
@@ -118,6 +122,8 @@ const TableCell = element("td");
 const useT = () => (key, values) =>
   values ? `${key}:${JSON.stringify(values)}` : key;
 
+const adminNavigation = loadModule("src/lib/admin-navigation.ts");
+
 const webhookTypes = loadModule(
   "src/app/admin/webhooks/webhook-types.ts",
 );
@@ -139,10 +145,20 @@ export const uiDependencies = {
   react: React,
   "lucide-react": icons,
   sonner: { toast },
+  "next/link": {
+    __esModule: true,
+    default: ({ href, children, ...props }) =>
+      React.createElement(
+        "a",
+        { href: typeof href === "string" ? href : "#", ...domProps("a", props) },
+        children,
+      ),
+  },
   "next/navigation": {
     useRouter: () => ({ push() {}, replace() {}, refresh() {} }),
+    usePathname: () => "/console-test/merchants",
   },
-  "@/components/locale-provider": { useT },
+  "@/components/locale-provider": { useT, useLocale: () => ({ t: useT(), locale: "zh-CN" }) },
   "@/components/theme-toggle": {
     ThemeToggle: () => React.createElement("button", null, "theme"),
   },
@@ -173,7 +189,14 @@ export const uiDependencies = {
         action,
       ),
   },
+  "@/components/ui/sheet": {
+    Sheet,
+    SheetTrigger,
+    SheetContent,
+    SheetTitle,
+  },
   "@/components/ui/button": { Button },
+  "@/lib/chat-drafts": { clearAccountDrafts() {} },
   "@/components/ui/input": { Input },
   "@/components/ui/textarea": { Textarea },
   "@/components/ui/label": { Label },
@@ -256,6 +279,7 @@ export const uiDependencies = {
   },
   "./visitor-panel-shared": visitorPanelShared,
   "./webhook-types": webhookTypes,
+  "@/lib/admin-navigation": adminNavigation,
   "@/lib/visitor-env": {
     describeVisitor: () => ({
       device: "Desktop",
