@@ -57,6 +57,18 @@ const { AdminShellHeader } = loadUiModule(
 const { NavContent } = loadUiModule(
   "src/components/admin/admin-nav-content.tsx",
 );
+const { WechatLoginActions } = loadUiModule(
+  "src/components/admin/wechat-login-actions.tsx",
+);
+const { WechatLoginConfig } = loadUiModule(
+  "src/components/admin/wechat-login-config.tsx",
+);
+const { WechatLoginLogs } = loadUiModule(
+  "src/components/admin/wechat-login-logs.tsx",
+);
+const { WechatLoginVisual } = loadUiModule(
+  "src/components/admin/wechat-login-visual.tsx",
+);
 
 const noop = () => {};
 
@@ -261,6 +273,73 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(rating, /widget\.closedByAgent/);
   assert.match(rating, /widget\.rateHint/);
   assert.match(rating, /widget\.startNew/);
+});
+
+test("WeChat login split components render status, actions and config", () => {
+  const state = {
+    status: "online",
+    qrUrl: null,
+    scanned: false,
+    account: { userId: "wx-user", accountId: "wx-account" },
+    error: null,
+    hasCredentials: true,
+    running: true,
+    storageDir: "./data/uploads/wechatbot",
+    logs: [
+      {
+        at: "2026-10-23T09:00:00.000Z",
+        level: "info",
+        message: "WeChat connected",
+      },
+    ],
+  };
+  const visual = renderUi(WechatLoginVisual, {
+    state,
+    accountLabel: "wx-user",
+  });
+  assert.match(visual, /wechat\.loggedInAs/);
+
+  const actions = renderUi(WechatLoginActions, {
+    state,
+    busy: null,
+    waiting: false,
+    onStart: noop,
+    onRestart: noop,
+    onStop: noop,
+    onLogout: noop,
+    onRefresh: noop,
+  });
+  assert.match(actions, /wechat\.stop/);
+  assert.match(actions, /wechat\.logout/);
+  assert.match(actions, /common\.refresh/);
+
+  const config = renderUi(WechatLoginConfig, {
+    state,
+    config: { enabled: true, defaultTo: "wx-user" },
+    defaultTo: "wx-user",
+    testTo: "",
+    busy: null,
+    savingTo: false,
+    onEnabledChange: noop,
+    onDefaultToChange: noop,
+    onSaveDefaultTo: noop,
+    onTestToChange: noop,
+    onSendTest: noop,
+  });
+  assert.match(config, /wechat\.enabled/);
+  assert.match(config, /wechat\.defaultTo/);
+  assert.match(config, /wechat\.sendTest/);
+  assert.match(config, /wechat\.storageHint/);
+
+  const logs = renderUi(WechatLoginLogs, {
+    logs: state.logs,
+    open: true,
+    clockReady: true,
+    onToggle: noop,
+  });
+  assert.match(logs, /wechat\.logs/);
+  assert.match(logs, /WeChat connected/);
+  assert.match(logs, /09:00:00/);
 });
 
 test("admin shell header and navigation expose workspace routes", () => {

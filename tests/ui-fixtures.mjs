@@ -142,6 +142,10 @@ const toast = Object.assign(() => {}, {
 
 export const uiDependencies = {
   "react/jsx-runtime": require("react/jsx-runtime"),
+  "qrcode.react": {
+    QRCodeSVG: ({ value }) =>
+      React.createElement("div", { "data-qr": value }, "qr-code"),
+  },
   react: React,
   "lucide-react": icons,
   sonner: { toast },
@@ -276,6 +280,7 @@ export const uiDependencies = {
   "@/lib/format": {
     formatRelative: () => "2 minutes ago",
     formatDateTime: () => "2026-10-23 09:00",
+    formatClock: () => "09:00:00",
   },
   "./visitor-panel-shared": visitorPanelShared,
   "./webhook-types": webhookTypes,
