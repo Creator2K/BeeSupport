@@ -29,6 +29,15 @@ const { WidgetComposer } = loadUiModule(
 const { WidgetClosedCard } = loadUiModule(
   "src/components/widget/widget-closed-card.tsx",
 );
+const { VisitorProfileSection } = loadUiModule(
+  "src/components/agent/visitor-profile-section.tsx",
+);
+const { VisitorHistorySection } = loadUiModule(
+  "src/components/agent/visitor-history-section.tsx",
+);
+const { VisitorConversationFields } = loadUiModule(
+  "src/components/agent/visitor-conversation-fields.tsx",
+);
 const { AiConnectionTab } = loadUiModule(
   "src/app/admin/ai/ai-connection-tab.tsx",
 );
@@ -240,6 +249,94 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(rating, /widget\.closedByAgent/);
   assert.match(rating, /widget\.rateHint/);
   assert.match(rating, /widget\.startNew/);
+});
+
+test("visitor panel sections render profile, history and edit controls", () => {
+  const conversation = {
+    id: "conversation-1",
+    siteName: "Demo Site",
+    firstResponseAt: new Date().toISOString(),
+    messageCount: 12,
+    visitor: {
+      id: "visitor-1",
+      name: "Visitor",
+      email: "visitor@example.test",
+      online: true,
+      blocked: false,
+      profileTags: ["VIP"],
+      profileNote: "Priority customer",
+      visitCount: 3,
+      pageViews: 8,
+      firstSeenAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+      landingPage: "https://example.test/pricing",
+      lastPage: "https://example.test/docs",
+      lastPageTitle: "Docs",
+      referrer: "https://search.example.test/",
+      meta: {
+        screen: "1920x1080",
+        dpr: 2,
+        locale: "zh-CN",
+        timezone: "Asia/Shanghai",
+      },
+    },
+  };
+  const profile = renderUi(VisitorProfileSection, {
+    conversation,
+    historyCount: 4,
+    profileHref: "/admin/visitors/visitor-1",
+  });
+  assert.match(profile, /visitor@example\.test/);
+  assert.match(profile, /VIP/);
+  assert.match(profile, /Priority customer/);
+  assert.match(profile, /Demo Site/);
+  assert.match(profile, /Desktop/);
+  assert.match(profile, /Windows/);
+
+  const history = renderUi(VisitorHistorySection, {
+    history: [
+      {
+        id: "conversation-old",
+        subject: "Old issue",
+        lastMessagePreview: "Preview",
+        status: "CLOSED",
+        createdAt: new Date().toISOString(),
+        messageCount: 4,
+        agentName: "Agent One",
+        rating: 5,
+      },
+    ],
+    loading: false,
+    onRefresh: noop,
+    onOpenConversation: noop,
+  });
+  assert.match(history, /Old issue/);
+  assert.match(history, /conversations\.statusClosed/);
+  assert.match(history, /Agent One/);
+
+  const fields = renderUi(VisitorConversationFields, {
+    subject: "Subject",
+    tags: ["vip", "billing"],
+    tagDraft: "new-tag",
+    note: "Internal note",
+    priority: "2",
+    rating: 4,
+    ratingComment: "Good service",
+    pending: false,
+    onSubjectChange: noop,
+    onSaveSubject: noop,
+    onTagDraftChange: noop,
+    onAddTag: noop,
+    onRemoveTag: noop,
+    onPriorityChange: noop,
+    onNoteChange: noop,
+    onSaveNote: noop,
+  });
+  assert.match(fields, /id="conversation-subject"/);
+  assert.match(fields, /common\.tags/);
+  assert.match(fields, /Internal note/);
+  assert.match(fields, /workbench\.ratingLabel/);
+  assert.match(fields, /Good service/);
 });
 
 test("AI admin tabs render model, prompt and knowledge editor controls", () => {

@@ -105,6 +105,11 @@ const Separator = element("hr");
 const useT = () => (key, values) =>
   values ? `${key}:${JSON.stringify(values)}` : key;
 
+const visitorPanelShared = loadModule(
+  "src/components/agent/visitor-panel-shared.tsx",
+  { "react/jsx-runtime": require("react/jsx-runtime") },
+);
+
 const toast = Object.assign(() => {}, {
   success() {},
   error() {},
@@ -208,7 +213,18 @@ export const uiDependencies = {
         .join(" "),
   },
   "@/lib/launcher": { launcherForeground: () => "#ffffff" },
-  "@/lib/format": { formatRelative: () => "2 minutes ago" },
+  "@/lib/format": {
+    formatRelative: () => "2 minutes ago",
+    formatDateTime: () => "2026-10-23 09:00",
+  },
+  "./visitor-panel-shared": visitorPanelShared,
+  "@/lib/visitor-env": {
+    describeVisitor: () => ({
+      device: "Desktop",
+      os: "Windows",
+      browser: "Chrome",
+    }),
+  },
 };
 
 export function loadUiModule(filename) {
