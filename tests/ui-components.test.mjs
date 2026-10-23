@@ -96,6 +96,12 @@ const { BrandingSettingFields } = loadUiModule(
 const { BrandingPreview } = loadUiModule(
   "src/components/admin/branding-preview.tsx",
 );
+const { SubscriptionPlanCard } = loadUiModule(
+  "src/components/admin/subscription-plan-card.tsx",
+);
+const { SubscriptionOrderDialog } = loadUiModule(
+  "src/components/admin/subscription-order-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -408,6 +414,56 @@ test("visitor insights split components render metrics, trend and breakdowns", (
   });
   assert.match(sites, /Demo Site/);
   assert.match(sites, /\/console-test\/visitors\?siteId=site-1/);
+});
+
+test("subscription catalog split components render plans and order confirmation", () => {
+  const plan = {
+    id: "plan-1",
+    name: "Pro Plan",
+    description: "For growing teams",
+    priceCents: 9900,
+    durationDays: 30,
+    maxAgents: 10,
+    maxSites: 3,
+    monthlyConversations: 5000,
+    storageMB: 2048,
+    features: {},
+    updatedAt: "2026-10-23T09:00:00.000Z",
+  };
+  const usage = {
+    agents: 4,
+    sites: 2,
+    conversations: 1000,
+    storageBytes: 1048576,
+  };
+  const card = renderUi(SubscriptionPlanCard, {
+    plan,
+    usage,
+    pendingOrder: false,
+    onSelect: noop,
+  });
+  assert.match(card, /Pro Plan/);
+  assert.match(card, /99\.00/);
+  assert.match(card, /\u9009\u62e9\u5957\u9910/);
+
+  const conflict = renderUi(SubscriptionPlanCard, {
+    plan,
+    usage: { ...usage, agents: 20 },
+    pendingOrder: false,
+    onSelect: noop,
+  });
+  assert.match(conflict, /Current usage exceeds the plan/);
+
+  const dialog = renderUi(SubscriptionOrderDialog, {
+    plan,
+    longTerm: true,
+    onClose: noop,
+    onSubmitted: noop,
+  });
+  assert.match(dialog, /\u786e\u8ba4\u5957\u9910\u8ba2\u5355/);
+  assert.match(dialog, /merchant-order-note/);
+  assert.match(dialog, /\u957f\u671f\u6709\u6548/);
+  assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
 });
 
 test("branding split components render style controls, fields and preview", () => {

@@ -295,6 +295,10 @@ export const uiDependencies = {
   "@/lib/clipboard": { copyText: async () => true },
   "@/lib/subscriptions": {
     formatPrice: (cents) => `?${(cents / 100).toFixed(2)}`,
+    quotaConflict: (plan, usage) =>
+      usage.agents > plan.maxAgents
+        ? "Current usage exceeds the plan"
+        : null,
     orderStatusLabels: {
       PENDING: "pending",
       CONFIRMED: "confirmed",
@@ -305,6 +309,7 @@ export const uiDependencies = {
   },
   "@/server/actions/subscriptions": {
     decideOrderAction: async () => ({ ok: true, message: "ok" }),
+    submitOrderAction: async () => ({ ok: true, message: "ok" }),
   },
   "./feature-summary": {
     FeatureSummary: () => React.createElement("span", null, "feature-summary"),
