@@ -141,6 +141,18 @@ const { CannedFormDialog } = loadUiModule(
 const { CannedDeleteDialog } = loadUiModule(
   "src/app/admin/canned/canned-delete-dialog.tsx",
 );
+const { HomeCopyFields } = loadUiModule(
+  "src/app/admin/homepage/home-copy-fields.tsx",
+);
+const { HomeFeatureFields } = loadUiModule(
+  "src/app/admin/homepage/home-feature-fields.tsx",
+);
+const { HomeFaqFields } = loadUiModule(
+  "src/app/admin/homepage/home-faq-fields.tsx",
+);
+const { HomePlanFields } = loadUiModule(
+  "src/app/admin/homepage/home-plan-fields.tsx",
+);
 
 const noop = () => {};
 
@@ -503,6 +515,73 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("home editor split components render copy, features, FAQs and plans", () => {
+  const content = {
+    brandName: "Demo",
+    description: "Demo description",
+    heroEyebrow: "Demo eyebrow",
+    titleLine1: "Title one",
+    titleLine2: "Title two",
+    titleHighlight: "Highlight",
+    heroDescription: "Hero description",
+    primaryCta: "Start",
+    closingTitle: "Closing",
+    footerText: "Footer",
+    sections: {
+      features: true,
+      appearance: true,
+      steps: true,
+      faq: true,
+      plans: true,
+    },
+    features: [{ title: "Feature one", text: "Feature text", tag: "Tag" }],
+    faqs: [{ question: "Question one", answer: "Answer one" }],
+    planIds: ["plan-1", "removed-plan"],
+  };
+  const copy = renderUi(HomeCopyFields, {
+    content,
+    update: noop,
+    disabled: false,
+  });
+  assert.match(copy, /\u9996\u9875\u54c1\u724c\u540d/);
+  assert.match(copy, /\u5c55\u793a\u533a\u5757/);
+  assert.match(copy, /\u4ea7\u54c1\u80fd\u529b/);
+
+  const features = renderUi(HomeFeatureFields, {
+    content,
+    update: noop,
+    disabled: false,
+  });
+  assert.match(features, /\u4ea7\u54c1\u80fd\u529b\u5361\u7247/);
+  assert.match(features, /Feature one/);
+
+  const faqs = renderUi(HomeFaqFields, {
+    content,
+    update: noop,
+    disabled: false,
+  });
+  assert.match(faqs, /\u5e38\u89c1\u95ee\u9898/);
+  assert.match(faqs, /\u6dfb\u52a0\u5e38\u89c1\u95ee\u9898/);
+  assert.match(faqs, /Question one/);
+
+  const plans = renderUi(HomePlanFields, {
+    content,
+    plans: [
+      {
+        id: "plan-1",
+        name: "Pro Plan",
+        priceCents: 9900,
+        durationDays: 30,
+      },
+    ],
+    update: noop,
+    disabled: false,
+  });
+  assert.match(plans, /Pro Plan/);
+  assert.match(plans, /99\.00/);
+  assert.match(plans, /\u5931\u6548\u5957\u9910/);
 });
 
 test("canned reply split components render list, editor and delete confirmation", () => {
