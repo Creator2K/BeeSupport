@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { createAgentAction, updateAgentAction } from "@/server/actions/agents";
 
-import type { AgentRecord, SiteOption } from "./agents-client";
+import type { AgentRecord, AgentSiteOption } from "./agent-types";
 
 type FormState = {
   name: string;
@@ -54,7 +54,7 @@ export function AgentFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: AgentRecord | null;
-  sites: SiteOption[];
+  sites: AgentSiteOption[];
   onSaved: () => void;
 }) {
   const t = useT();

@@ -159,6 +159,13 @@ const { AiTabsHeader } = loadUiModule(
 const { AiKnowledgeDeleteDialog } = loadUiModule(
   "src/app/admin/ai/ai-knowledge-delete-dialog.tsx",
 );
+const { AgentTable } = loadUiModule("src/app/admin/agents/agent-table.tsx");
+const { AgentResetPasswordDialog } = loadUiModule(
+  "src/app/admin/agents/agent-reset-password-dialog.tsx",
+);
+const { AgentDeleteDialog } = loadUiModule(
+  "src/app/admin/agents/agent-delete-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -521,6 +528,49 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("agent split components render member table and account dialogs", () => {
+  const agent = {
+    id: "agent-1",
+    name: "Agent One",
+    email: "agent@example.test",
+    role: "AGENT",
+    active: true,
+    status: "ONLINE",
+    siteIds: ["site-1"],
+    lastSeenAt: "2026-10-23T09:00:00.000Z",
+    createdAt: "2026-10-23T08:00:00.000Z",
+    emailVerificationPending: true,
+  };
+  const table = renderUi(AgentTable, {
+    agents: [agent],
+    sites: [{ id: "site-1", name: "Demo Site" }],
+    onCreate: noop,
+    onEdit: noop,
+    onReset: noop,
+    onDelete: noop,
+  });
+  assert.match(table, /Agent One/);
+  assert.match(table, /agents\.roleAgent/);
+  assert.match(table, /Demo Site/);
+  assert.match(table, /workbench\.statusOnline/);
+
+  const reset = renderUi(AgentResetPasswordDialog, {
+    agent,
+    onClose: noop,
+    onDone: noop,
+  });
+  assert.match(reset, /agents\.resetPassword/);
+  assert.match(reset, /id="reset-password"/);
+
+  const remove = renderUi(AgentDeleteDialog, {
+    agent,
+    onClose: noop,
+    onDeleted: noop,
+  });
+  assert.match(remove, /agents\.deleteConfirm/);
+  assert.match(remove, /common\.confirm/);
 });
 
 test("AI client split toolbar switches connection and knowledge actions", () => {

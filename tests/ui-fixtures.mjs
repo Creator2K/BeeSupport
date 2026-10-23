@@ -337,6 +337,12 @@ export const uiDependencies = {
     deleteCannedAction: async () => ({ ok: true, message: "ok" }),
     updateCannedAction: async () => ({ ok: true, message: "ok" }),
   },
+  "@/server/actions/agents": {
+    createAgentAction: async () => ({ ok: true, message: "ok" }),
+    deleteAgentAction: async () => ({ ok: true, message: "ok" }),
+    resetAgentPasswordAction: async () => ({ ok: true, message: "ok" }),
+    updateAgentAction: async () => ({ ok: true, message: "ok" }),
+  },
   "./feature-summary": {
     FeatureSummary: () => React.createElement("span", null, "feature-summary"),
   },
