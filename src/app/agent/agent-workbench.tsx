@@ -2,74 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRightLeft,
-  Check,
-  RotateCcw,
-  ChevronDown,
-  Loader2,
-  LogOut,
-  MessagesSquare,
-  Paperclip,
-  RefreshCw,
-  Send,
-  Settings,
-  Sparkles,
-  UserRound,
-  Volume2,
-  VolumeX,
-  Wifi,
-  WifiOff,
-  Zap,
-} from "lucide-react";
+import { Loader2, MessagesSquare, Paperclip, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useChatDrafts } from "@/lib/use-chat-drafts";
 import { clearAccountDrafts } from "@/lib/chat-drafts";
 
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { useT } from "@/components/locale-provider";
 import {
   ConversationList,
   type WorkbenchFilters,
 } from "@/components/agent/conversation-list";
 import { MessageBubble } from "@/components/agent/message-bubble";
-import { NotificationSettings } from "@/components/agent/notification-settings";
 import { VisitorPanel } from "@/components/agent/visitor-panel";
-import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -79,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { formatRelative } from "@/lib/format";
 import {
   bindAudioUnlock,
   playSound,
@@ -110,33 +54,19 @@ import { listTransferTargetsAction } from "@/server/actions/agents";
 import { savePreferencesAction } from "@/server/actions/preferences";
 import { cn } from "@/lib/utils";
 import { appendCannedText } from "@/lib/canned";
-import { DueFollowUps } from "@/components/follow-ups/due-follow-ups";
-import { FollowUpLauncher } from "@/components/follow-ups/follow-up-launcher";
+import { AiSuggestionPanel } from "@/components/agent/ai-suggestion-panel";
+import { CannedReplyPicker } from "@/components/agent/canned-reply-picker";
+import { ConversationHeader } from "@/components/agent/conversation-header";
+import type {
+  AiSuggestionTrace,
+  CannedItem,
+  TransferTarget,
+  WorkbenchMe,
+} from "@/components/agent/workbench-types";
+import { WorkbenchDialogs } from "@/components/agent/workbench-dialogs";
+import { WorkbenchHeader } from "@/components/agent/workbench-header";
 
-export type WorkbenchMe = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: "ONLINE" | "AWAY" | "OFFLINE";
-};
-
-type CannedItem = {
-  id: string;
-  title: string;
-  content: string;
-  shortcut: string | null;
-  siteId: string | null;
-  category: string;
-  shared: boolean;
-};
-
-type TransferTarget = {
-  id: string;
-  name: string;
-  email: string;
-  status: string;
-};
+export type { WorkbenchMe } from "@/components/agent/workbench-types";
 
 export function AgentWorkbench({
   me,
@@ -290,11 +220,7 @@ export function AgentWorkbench({
   const aiSuggestion =
     suggestion?.conversationId === activeId ? suggestion.text : null;
   const aiRequestRef = useRef<AbortController | null>(null);
-  const [aiTrace, setAiTrace] = useState<{
-    model: string;
-    tools: { name: string; summary: string; ok: boolean; ms: number }[];
-    knowledge: { title: string; score: number; via: string }[];
-  } | null>(null);
+  const [aiTrace, setAiTrace] = useState<AiSuggestionTrace | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const loadingRef = useRef<Set<string>>(new Set());
@@ -1191,146 +1117,22 @@ export function AgentWorkbench({
   const cannedCategories =
     cannedResult.siteId === cannedSiteId ? cannedResult.categories : [];
 
-  const statusDot =
-    agentStatus === "ONLINE"
-      ? "bg-emerald-500"
-      : agentStatus === "AWAY"
-        ? "bg-amber-500"
-        : "bg-zinc-400";
-
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md text-[11px] font-bold">
-            B
-          </div>
-          <span className="hidden text-sm font-semibold tracking-tight sm:inline">
-            {t("nav.agentTitle")}
-          </span>
-        </div>
-
-        <span
-          className={cn(
-            "text-muted-foreground ml-2 inline-flex items-center gap-1 text-[11px]",
-            connected ? "text-muted-foreground" : "text-amber-600",
-          )}
-          title={
-            connected
-              ? t("workbench.connectionOnline")
-              : t("workbench.connectionOffline")
-          }
-        >
-          {connected ? (
-            <Wifi className="size-3.5" />
-          ) : (
-            <WifiOff className="size-3.5" />
-          )}
-          <span className="hidden md:inline">
-            {connected
-              ? t("workbench.connectionOnline")
-              : t("workbench.connectionOffline")}
-          </span>
-        </span>
-
-        <div className="ml-auto flex items-center gap-1">
-          <DueFollowUps />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void refreshList()}
-            title={t("common.refresh")}
-          >
-            <RefreshCw
-              className={cn("size-4", loadingList && "animate-spin")}
-            />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            title={
-              prefs.soundPreset === "none"
-                ? t("workbench.soundOff")
-                : t("workbench.soundOn")
-            }
-            onClick={toggleMute}
-          >
-            {prefs.soundPreset === "none" ? (
-              <VolumeX className="size-4" />
-            ) : (
-              <Volume2 className="size-4" />
-            )}
-          </Button>
-
-          <NotificationSettings
-            preferences={prefs}
-            onChange={updatePreferences}
-          />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                disabled={statusPending}
-                aria-label={
-                  agentStatus === "ONLINE"
-                    ? t("workbench.statusOnline")
-                    : agentStatus === "AWAY"
-                      ? t("workbench.statusAway")
-                      : t("workbench.statusOffline")
-                }
-              >
-                <span className={cn("size-2 rounded-full", statusDot)} />
-                <span className="hidden sm:inline">
-                  {agentStatus === "ONLINE"
-                    ? t("workbench.statusOnline")
-                    : agentStatus === "AWAY"
-                      ? t("workbench.statusAway")
-                      : t("workbench.statusOffline")}
-                </span>
-                <ChevronDown className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{me.name}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => void changeStatus("ONLINE")}>
-                <span className="size-2 rounded-full bg-emerald-500" />
-                {t("workbench.statusOnline")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void changeStatus("AWAY")}>
-                <span className="size-2 rounded-full bg-amber-500" />
-                {t("workbench.statusAway")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void changeStatus("OFFLINE")}>
-                <span className="size-2 rounded-full bg-zinc-400" />
-                {t("workbench.statusOffline")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {me.role !== "AGENT" ? (
-                <DropdownMenuItem onSelect={() => router.push(adminPath)}>
-                  <Settings className="size-4" />
-                  {t("nav.admin")}
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuItem onSelect={() => router.push("/agent/settings")}>
-                <UserRound className="size-4" />
-                {t("settings.profile")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void handleLogout()}>
-                <LogOut className="size-4" />
-                {t("common.logout")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <LanguageSwitcher />
-          <ThemeToggle />
-        </div>
-      </header>
+      <WorkbenchHeader
+        me={me}
+        connected={connected}
+        loadingList={loadingList}
+        preferences={prefs}
+        agentStatus={agentStatus}
+        statusPending={statusPending}
+        adminPath={adminPath}
+        onRefresh={() => void refreshList()}
+        onToggleMute={toggleMute}
+        onPreferencesChange={updatePreferences}
+        onChangeStatus={(status) => void changeStatus(status)}
+        onLogout={() => void handleLogout()}
+      />
 
       <div className="flex min-h-0 flex-1">
         <div
@@ -1368,122 +1170,17 @@ export function AgentWorkbench({
             </div>
           ) : (
             <>
-              <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="sm:hidden"
-                  aria-label={t("common.back")}
-                  onClick={() => setMobileChatOpen(false)}
-                >
-                  <ArrowLeft className="size-4" />
-                </Button>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium">
-                      {activeConversation.visitor.name ??
-                        activeConversation.visitor.email}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className="h-4 max-w-20 truncate px-1.5 text-[10px] sm:max-w-40"
-                      title={activeConversation.siteName}
-                    >
-                      {activeConversation.siteName}
-                    </Badge>
-                    {activeConversation.status === "PENDING" ? (
-                      <Badge className="hidden h-4 bg-amber-500/15 px-1.5 text-[10px] text-amber-800 sm:inline-flex dark:text-amber-300">
-                        {t("conversations.statusPending")}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        activeConversation.visitor.online
-                          ? "bg-emerald-500"
-                          : "bg-zinc-400",
-                      )}
-                    />
-                    {typingConversationId === activeConversation.id
-                      ? t("workbench.visitorTyping")
-                      : activeConversation.visitor.online
-                        ? t("workbench.visitorOnline")
-                        : formatRelative(activeConversation.visitor.lastSeenAt)}
-                  </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1">
-                  {activeConversation.status === "PENDING" ? (
-                    <Button
-                      size="sm"
-                      disabled={actionPending}
-                      aria-label={t("workbench.claim")}
-                      onClick={() => void runAction("claim")}
-                    >
-                      <Zap className="size-3.5" />
-                      <span className="ml-1.5 hidden sm:inline">
-                        {t("workbench.claim")}
-                      </span>
-                    </Button>
-                  ) : null}
-
-                  <FollowUpLauncher
-                    key={activeConversation.id}
-                    conversationId={activeConversation.id}
-                    compact
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={
-                      actionPending ||
-                      targetsLoading ||
-                      activeConversation.status === "CLOSED"
-                    }
-                    onClick={() => void openTransfer()}
-                    aria-label={t("workbench.transfer")}
-                    title={t("workbench.transfer")}
-                  >
-                    <ArrowRightLeft className="size-4 sm:hidden" />
-                    <span className="hidden sm:inline">
-                      {t("workbench.transfer")}
-                    </span>
-                  </Button>
-
-                  {activeConversation.status === "CLOSED" ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={actionPending}
-                      onClick={() => void runAction("reopen")}
-                      aria-label={t("workbench.reopen")}
-                      title={t("workbench.reopen")}
-                    >
-                      <RotateCcw className="size-4 sm:hidden" />
-                      <span className="hidden sm:inline">
-                        {t("workbench.reopen")}
-                      </span>
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={actionPending}
-                      onClick={() => setCloseConfirmOpen(true)}
-                      aria-label={t("workbench.close")}
-                      title={t("workbench.close")}
-                    >
-                      <Check className="size-4 sm:hidden" />
-                      <span className="hidden sm:inline">
-                        {t("workbench.close")}
-                      </span>
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <ConversationHeader
+                conversation={activeConversation}
+                typingConversationId={typingConversationId}
+                actionPending={actionPending}
+                targetsLoading={targetsLoading}
+                onBack={() => setMobileChatOpen(false)}
+                onClaim={() => void runAction("claim")}
+                onTransfer={() => void openTransfer()}
+                onReopen={() => void runAction("reopen")}
+                onRequestClose={() => setCloseConfirmOpen(true)}
+              />
 
               <div
                 ref={scrollRef}
@@ -1550,65 +1247,21 @@ export function AgentWorkbench({
                   </Button>
                 ) : null}
                 {aiSuggestion ? (
-                  <div className="animate-pop mb-2 rounded-lg border border-dashed p-2.5">
-                    <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-[11px] font-medium tracking-wide uppercase">
-                      <Sparkles className="size-3" />
-                      {t("workbench.aiSuggest")}
-                      {aiTrace?.model ? (
-                        <span className="font-normal normal-case opacity-70">
-                          · {aiTrace.model}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="chat-text text-sm leading-relaxed">
-                      {aiSuggestion}
-                    </p>
-
-                    {aiTrace &&
-                    (aiTrace.tools.length > 0 ||
-                      aiTrace.knowledge.length > 0) ? (
-                      <div className="text-muted-foreground mt-1.5 space-y-0.5 text-[10px] leading-relaxed">
-                        {aiTrace.tools.map((tool, index) => (
-                          <div key={`${tool.name}-${index}`}>
-                            {t("workbench.aiTools")} · {tool.name} —{" "}
-                            {tool.summary}
-                          </div>
-                        ))}
-                        {aiTrace.knowledge.map((item, index) => (
-                          <div key={`${item.title}-${index}`}>
-                            {t("workbench.aiKnowledge")} · {item.title}（
-                            {item.score}）
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setDraft((prev) =>
-                            prev ? `${prev}\n${aiSuggestion}` : aiSuggestion,
-                          );
-                          setSuggestion(null);
-                          setAiTrace(null);
-                        }}
-                      >
-                        {t("workbench.aiUse")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setSuggestion(null);
-                          setAiTrace(null);
-                        }}
-                      >
-                        {t("workbench.aiDismiss")}
-                      </Button>
-                    </div>
-                  </div>
+                  <AiSuggestionPanel
+                    text={aiSuggestion}
+                    trace={aiTrace}
+                    onUse={() => {
+                      setDraft((prev) =>
+                        prev ? `${prev}\n${aiSuggestion}` : aiSuggestion,
+                      );
+                      setSuggestion(null);
+                      setAiTrace(null);
+                    }}
+                    onDismiss={() => {
+                      setSuggestion(null);
+                      setAiTrace(null);
+                    }}
+                  />
                 ) : null}
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -1704,122 +1357,21 @@ export function AgentWorkbench({
                       )}
                     </Button>
 
-                    <Popover open={cannedOpen} onOpenChange={changeCannedOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon-sm"
-                          title={t("workbench.canned")}
-                          aria-label={t("workbench.canned")}
-                        >
-                          <Zap className="size-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="end"
-                        aria-label={t("workbench.canned")}
-                        className="w-80 max-w-[calc(100vw-2rem)] p-2"
-                      >
-                        <Input
-                          aria-label={t("workbench.cannedSearch")}
-                          maxLength={120}
-                          value={cannedQuery}
-                          onChange={(event) =>
-                            setCannedQuery(event.target.value)
-                          }
-                          placeholder={t("workbench.cannedSearch")}
-                          className="mb-2 h-8 text-xs"
-                          onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter" &&
-                              !event.nativeEvent.isComposing &&
-                              filteredCanned.length === 1
-                            ) {
-                              event.preventDefault();
-                              void insertCanned(filteredCanned[0]);
-                            }
-                          }}
-                        />
-                        <select
-                          aria-label={t("canned.category")}
-                          value={cannedCategory}
-                          onChange={(event) =>
-                            setCannedCategory(event.target.value)
-                          }
-                          className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-xs"
-                        >
-                          <option value="">{t("canned.allCategories")}</option>
-                          {cannedCategories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                        <div
-                          className="max-h-64 space-y-1 overflow-y-auto"
-                          aria-busy={cannedLoading}
-                        >
-                          {cannedLoading ? (
-                            <p
-                              role="status"
-                              className="py-4 text-center text-xs"
-                            >
-                              {t("canned.loading")}
-                            </p>
-                          ) : cannedResult.error ? (
-                            <p
-                              role="alert"
-                              className="py-4 text-center text-xs text-red-800 dark:text-red-300"
-                            >
-                              {t("canned.loadFailed")}
-                            </p>
-                          ) : filteredCanned.length === 0 ? (
-                            <p className="text-muted-foreground py-4 text-center text-xs">
-                              {t("common.empty")}
-                            </p>
-                          ) : (
-                            filteredCanned.map((item) => (
-                              <button
-                                key={item.id}
-                                type="button"
-                                disabled={cannedInserting}
-                                className="hover:bg-accent w-full rounded-md px-2 py-1.5 text-left disabled:opacity-50"
-                                onClick={() => void insertCanned(item)}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <span className="min-w-0 break-all text-xs font-medium">
-                                    {item.title}
-                                  </span>
-                                  {item.category && (
-                                    <span className="max-w-full break-all rounded border px-1 text-[10px]">
-                                      {item.category}
-                                    </span>
-                                  )}
-                                  {!item.shared && (
-                                    <span className="rounded border px-1 text-[10px]">
-                                      {t("canned.private")}
-                                    </span>
-                                  )}
-                                  {item.shortcut ? (
-                                    <span className="text-muted-foreground font-mono text-[10px]">
-                                      /{item.shortcut}
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span className="text-muted-foreground line-clamp-2 break-all text-[11px]">
-                                  {item.content}
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                        {!cannedLoading && cannedResult.hasMore && (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            {t("canned.moreHint")}
-                          </p>
-                        )}
-                      </PopoverContent>
-                    </Popover>
+                    <CannedReplyPicker
+                      open={cannedOpen}
+                      onOpenChange={changeCannedOpen}
+                      query={cannedQuery}
+                      onQueryChange={setCannedQuery}
+                      category={cannedCategory}
+                      onCategoryChange={setCannedCategory}
+                      categories={cannedCategories}
+                      loading={cannedLoading}
+                      error={Boolean(cannedResult.error)}
+                      items={filteredCanned}
+                      inserting={cannedInserting}
+                      hasMore={cannedResult.hasMore}
+                      onInsert={insertCanned}
+                    />
 
                     <label
                       className={cn(
@@ -1892,84 +1444,23 @@ export function AgentWorkbench({
         ) : null}
       </div>
 
-      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("workbench.transferTitle")}</DialogTitle>
-            <DialogDescription>{t("workbench.transferTo")}</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-72 space-y-1 overflow-y-auto">
-            {targetsLoading ? (
-              <p role="status">{t("common.loading")}</p>
-            ) : targetsError ? (
-              <Button variant="outline" onClick={() => void openTransfer()}>
-                {t("common.retry")}
-              </Button>
-            ) : targets.length === 0 ? (
-              <p className="text-muted-foreground py-6 text-center text-sm">
-                {t("common.empty")}
-              </p>
-            ) : (
-              targets.map((target) => (
-                <button
-                  key={target.id}
-                  type="button"
-                  className="hover:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-2 text-left"
-                  disabled={actionPending}
-                  onClick={() => void transferTo(target.id)}
-                >
-                  <span className="bg-muted flex size-7 items-center justify-center rounded-full text-[11px]">
-                    {target.name.slice(0, 1)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">
-                      {target.name}
-                    </span>
-                    <span className="text-muted-foreground block truncate text-[11px]">
-                      {target.email}
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      "size-2 shrink-0 rounded-full",
-                      target.status === "ONLINE"
-                        ? "bg-emerald-500"
-                        : target.status === "AWAY"
-                          ? "bg-amber-500"
-                          : "bg-zinc-400",
-                    )}
-                  />
-                </button>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("workbench.close")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("workbench.closeConfirm")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={actionPending}
-              onClick={(event) => {
-                event.preventDefault();
-                void runAction("close").then((ok) => {
-                  if (ok) setCloseConfirmOpen(false);
-                });
-              }}
-            >
-              {t("common.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <WorkbenchDialogs
+        transferOpen={transferOpen}
+        onTransferOpenChange={setTransferOpen}
+        targetsLoading={targetsLoading}
+        targetsError={targetsError}
+        targets={targets}
+        actionPending={actionPending}
+        onRetryTargets={() => void openTransfer()}
+        onTransfer={(targetId) => void transferTo(targetId)}
+        closeConfirmOpen={closeConfirmOpen}
+        onCloseConfirmOpenChange={setCloseConfirmOpen}
+        onConfirmClose={() => {
+          void runAction("close").then((ok) => {
+            if (ok) setCloseConfirmOpen(false);
+          });
+        }}
+      />
     </div>
   );
 }
