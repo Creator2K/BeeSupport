@@ -332,6 +332,11 @@ export const uiDependencies = {
     createSiteAction: async () => ({ ok: true, message: "ok" }),
     updateSiteAction: async () => ({ ok: true, message: "ok" }),
   },
+  "@/server/actions/canned": {
+    createCannedAction: async () => ({ ok: true, message: "ok" }),
+    deleteCannedAction: async () => ({ ok: true, message: "ok" }),
+    updateCannedAction: async () => ({ ok: true, message: "ok" }),
+  },
   "./feature-summary": {
     FeatureSummary: () => React.createElement("span", null, "feature-summary"),
   },

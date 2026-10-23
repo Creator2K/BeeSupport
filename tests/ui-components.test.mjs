@@ -132,6 +132,15 @@ const { ConversationListTable } = loadUiModule(
 const { ConversationDetailDialog } = loadUiModule(
   "src/app/admin/conversations/conversation-detail-dialog.tsx",
 );
+const { CannedListTable } = loadUiModule(
+  "src/app/admin/canned/canned-list-table.tsx",
+);
+const { CannedFormDialog } = loadUiModule(
+  "src/app/admin/canned/canned-form-dialog.tsx",
+);
+const { CannedDeleteDialog } = loadUiModule(
+  "src/app/admin/canned/canned-delete-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -494,6 +503,53 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("canned reply split components render list, editor and delete confirmation", () => {
+  const item = {
+    id: "canned-1",
+    title: "Pricing reply",
+    category: "Sales",
+    tenantName: "Demo Tenant",
+    shortcut: "price",
+    content: "Our pricing starts at 99 yuan.",
+    siteId: "site-1",
+    siteName: "Demo Site",
+    shared: false,
+    usageCount: 7,
+    ownerName: "Agent One",
+  };
+  const list = renderUi(CannedListTable, {
+    items: [item],
+    total: 1,
+    onCreate: noop,
+    onEdit: noop,
+    onDelete: noop,
+  });
+  assert.match(list, /Pricing reply/);
+  assert.match(list, /\/price/);
+  assert.match(list, /canned\.private/);
+  assert.match(list, /canned\.usage/);
+
+  const form = renderUi(CannedFormDialog, {
+    open: true,
+    onOpenChange: noop,
+    item: null,
+    sites: [{ id: "site-1", name: "Demo Site" }],
+    categories: ["Sales"],
+    onSaved: noop,
+  });
+  assert.match(form, /canned\.titleLabel/);
+  assert.match(form, /id="canned-content"/);
+  assert.match(form, /canned\.new/);
+
+  const remove = renderUi(CannedDeleteDialog, {
+    item,
+    onClose: noop,
+    onDeleted: noop,
+  });
+  assert.match(remove, /common\.deleteConfirm/);
+  assert.match(remove, /common\.confirm/);
 });
 
 test("conversation split components render filters, list and detail shell", () => {
