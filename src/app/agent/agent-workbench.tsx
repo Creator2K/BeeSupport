@@ -13,17 +13,7 @@ import {
   type WorkbenchFilters,
 } from "@/components/agent/conversation-list";
 import { VisitorPanel } from "@/components/agent/visitor-panel";
-import {
-  bindAudioUnlock,
-  playSound,
-  showDesktopNotification,
-  unlockAudio,
-} from "@/lib/notify";
-import {
-  parsePreferences,
-  type AgentPreferences,
-  type SoundPresetId,
-} from "@/lib/preferences";
+import type { AgentPreferences } from "@/lib/preferences";
 import type {
   SerializedConversation,
   SerializedMessage,
@@ -40,13 +30,9 @@ import {
   type SendAttempt,
 } from "@/lib/realtime/send-attempt";
 import { listTransferTargetsAction } from "@/server/actions/agents";
-import { savePreferencesAction } from "@/server/actions/preferences";
 import { cn } from "@/lib/utils";
-import { appendCannedText } from "@/lib/canned";
 import { ConversationHeader } from "@/components/agent/conversation-header";
 import type {
-  AiSuggestionTrace,
-  CannedItem,
   TransferTarget,
   WorkbenchMe,
 } from "@/components/agent/workbench-types";
@@ -54,6 +40,9 @@ import { WorkbenchDialogs } from "@/components/agent/workbench-dialogs";
 import { WorkbenchHeader } from "@/components/agent/workbench-header";
 import { WorkbenchComposer } from "@/components/agent/workbench-composer";
 import { WorkbenchMessageThread } from "@/components/agent/workbench-message-thread";
+import { useWorkbenchPreferences } from "./use-workbench-preferences";
+import { useWorkbenchAi } from "./use-workbench-ai";
+import { useWorkbenchCanned } from "./use-workbench-canned";
 
 export type { WorkbenchMe } from "@/components/agent/workbench-types";
 
@@ -165,33 +154,8 @@ export function AgentWorkbench({
   >(null);
   const [agentStatus, setAgentStatus] = useState(me.status);
   const [statusPending, setStatusPending] = useState(false);
-  const [prefs, setPrefs] = useState<AgentPreferences>(() =>
-    parsePreferences(initialPreferences),
-  );
-  const [cannedResult, setCannedResult] = useState<{
-    key: string;
-    siteId: string;
-    items: CannedItem[];
-    categories: string[];
-    hasMore: boolean;
-    error: boolean;
-  }>({
-    key: "",
-    siteId: "",
-    items: [],
-    categories: [],
-    hasMore: false,
-    error: false,
-  });
-  const [cannedCategory, setCannedCategory] = useState("");
-  const [cannedInserting, setCannedInserting] = useState(false);
-  const cannedInsertRef = useRef(false);
-  const [cannedQuery, setCannedQuery] = useState("");
-  const [cannedOpen, setCannedOpen] = useState(false);
-  function changeCannedOpen(open: boolean) {
-    if (open) setCannedResult((previous) => ({ ...previous, key: "" }));
-    setCannedOpen(open);
-  }
+  const { prefs, updatePreferences, alertUser, toggleMute } =
+    useWorkbenchPreferences(initialPreferences);
   const [transferOpen, setTransferOpen] = useState(false);
   const [targetsLoading, setTargetsLoading] = useState(false);
   const [targetsError, setTargetsError] = useState(false);
@@ -202,21 +166,25 @@ export function AgentWorkbench({
   const [mobileChatOpen, setMobileChatOpen] = useState(
     Boolean(initialConversationId),
   );
-  const [suggestion, setSuggestion] = useState<{
-    conversationId: string;
-    text: string;
-  } | null>(null);
-  const aiSuggestion =
-    suggestion?.conversationId === activeId ? suggestion.text : null;
-  const aiRequestRef = useRef<AbortController | null>(null);
-  const [aiTrace, setAiTrace] = useState<AiSuggestionTrace | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
 
   const loadingRef = useRef<Set<string>>(new Set());
   const activeIdRef = useRef<string | null>(activeId);
   activeIdRef.current = activeId;
-  const prefsRef = useRef<AgentPreferences>(initialPreferences);
-  prefsRef.current = prefs;
+  const {
+    aiSuggestion,
+    aiTrace,
+    aiLoading,
+    aiModelOptions,
+    activeAiModel,
+    generateSuggestion,
+    applySuggestion,
+    clearSuggestion,
+  } = useWorkbenchAi({
+    activeId,
+    activeIdRef,
+    ai,
+    preferredModel: prefs.preferredModel,
+  });
   const typingSentAtRef = useRef(0);
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -242,73 +210,14 @@ export function AgentWorkbench({
     activity: loadingMessages,
   });
 
-  useEffect(() => {
-    setSuggestion(null);
-    setAiTrace(null);
-    setAiLoading(false);
-    return () => {
-      aiRequestRef.current?.abort();
-      aiRequestRef.current = null;
-    };
-  }, [activeId]);
-
-  // 浏览器要求先有一次用户手势才允许出声，这里挂一次性解锁监听
-  useEffect(() => bindAudioUnlock(), []);
-
-  const preferenceQueue = useRef<Promise<void>>(Promise.resolve());
-  const preferenceVersion = useRef(0);
-  const confirmedPreferences = useRef(parsePreferences(initialPreferences));
-  const updatePreferences = useCallback(
-    (patch: Partial<AgentPreferences>) => {
-      const version = ++preferenceVersion.current;
-      setPrefs((prev) => parsePreferences({ ...prev, ...patch }));
-      preferenceQueue.current = preferenceQueue.current.then(async () => {
-        try {
-          const result = await savePreferencesAction(patch);
-          if (!result.ok) throw new Error(result.error);
-          confirmedPreferences.current = result.preferences;
-          if (version === preferenceVersion.current)
-            setPrefs(result.preferences);
-        } catch {
-          toast.error(t("common.operationFailed"));
-          if (version === preferenceVersion.current)
-            setPrefs(confirmedPreferences.current);
-        }
-      });
-    },
-    [t],
-  );
-
-  // Migrate the old local mute setting through the same error-aware save queue.
-  useEffect(() => {
-    const legacy = window.localStorage.getItem("beesupport:sound");
-    if (legacy) window.localStorage.removeItem("beesupport:sound");
-    if (legacy === "off") {
-      updatePreferences({ soundPreset: "none" });
-    }
-  }, [updatePreferences]);
-
-  /** 通知：按偏好播放提示音 + 桌面通知 */
-  const alertUser = useCallback(
-    (payload: {
-      title: string;
-      body: string;
-      tag: string;
-      onOpen?: () => void;
-    }) => {
-      const current = prefsRef.current;
-      playSound(current.soundPreset, current.soundVolume);
-      if (current.desktopNotify) {
-        showDesktopNotification({
-          title: payload.title,
-          body: payload.body,
-          tag: payload.tag,
-          onClick: payload.onOpen,
-        });
-      }
-    },
-    [],
-  );
+  const canned = useWorkbenchCanned({
+    activeConversation,
+    activeIdRef,
+    draftsRef,
+    onDraftChange: (conversationId, value) =>
+      setDrafts((previous) => ({ ...previous, [conversationId]: value })),
+    onFocus: () => composerRef.current?.focus(),
+  });
 
   const upsertConversation = useCallback(
     (conversation: SerializedConversation, refresh = true) => {
@@ -668,124 +577,13 @@ export function AgentWorkbench({
     return () => clearInterval(timer);
   }, [connected, loadMessages]);
 
-  // Refresh the current site's permitted replies on open, search and category changes.
-  const cannedSiteId = activeConversation?.siteId ?? "";
-  const cannedKey = JSON.stringify([cannedSiteId, cannedQuery, cannedCategory]);
-  useEffect(() => {
-    if (!cannedOpen || !cannedSiteId) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          const params = new URLSearchParams({
-            siteId: cannedSiteId,
-            query: cannedQuery,
-            category: cannedCategory,
-          });
-          const response = await fetch(`/api/agent/canned?${params}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          if (!response.ok) throw new Error("Unable to load replies");
-          const data = (await response.json()) as {
-            items: CannedItem[];
-            categories: string[];
-            hasMore: boolean;
-          };
-          if (!controller.signal.aborted)
-            setCannedResult({
-              ...data,
-              key: cannedKey,
-              siteId: cannedSiteId,
-              error: false,
-            });
-        } catch {
-          if (!controller.signal.aborted)
-            setCannedResult({
-              key: cannedKey,
-              siteId: cannedSiteId,
-              items: [],
-              categories: [],
-              hasMore: false,
-              error: true,
-            });
-        }
-      })();
-    }, 150);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [cannedOpen, cannedSiteId, cannedQuery, cannedCategory, cannedKey]);
-
   function selectConversation(id: string) {
-    setCannedOpen(false);
-    setCannedQuery("");
-    setCannedCategory("");
+    canned.reset();
     setActiveId(id);
     setMobileChatOpen(true);
-    setSuggestion(null);
-    setAiTrace(null);
+    clearSuggestion();
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `/agent?c=${id}`);
-    }
-  }
-
-  const aiModelOptions = useMemo(() => {
-    const list = [...ai.models];
-    const preferred = prefs.preferredModel;
-    if (preferred && !list.includes(preferred)) list.unshift(preferred);
-    return list;
-  }, [ai.models, prefs.preferredModel]);
-
-  const activeAiModel =
-    prefs.preferredModel && aiModelOptions.includes(prefs.preferredModel)
-      ? prefs.preferredModel
-      : (ai.defaultModel ?? aiModelOptions[0] ?? "");
-
-  async function generateSuggestion() {
-    if (!activeId || aiRequestRef.current) return;
-    const conversationId = activeId;
-    const controller = new AbortController();
-    aiRequestRef.current = controller;
-    setAiLoading(true);
-    try {
-      const response = await fetch(
-        `/api/agent/conversations/${activeId}/suggest`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: activeAiModel || undefined }),
-          signal: controller.signal,
-        },
-      );
-      const data = (await response.json().catch(() => ({}))) as {
-        text?: string;
-        model?: string;
-        trace?: { name: string; summary: string; ok: boolean; ms: number }[];
-        knowledge?: { title: string; score: number; via: string }[];
-        error?: string;
-      };
-      if (controller.signal.aborted || activeIdRef.current !== conversationId)
-        return;
-      if (!response.ok || !data.text) {
-        toast.error(data.error ?? t("workbench.aiFailed"));
-        return;
-      }
-      setSuggestion({ conversationId, text: data.text });
-      setAiTrace({
-        model: data.model ?? activeAiModel,
-        tools: data.trace ?? [],
-        knowledge: data.knowledge ?? [],
-      });
-    } catch {
-      if (!controller.signal.aborted && activeIdRef.current === conversationId)
-        toast.error(t("workbench.aiFailed"));
-    } finally {
-      if (aiRequestRef.current === controller) {
-        aiRequestRef.current = null;
-        setAiLoading(false);
-      }
     }
   }
 
@@ -1027,42 +825,6 @@ export function AgentWorkbench({
     if (await runAction("transfer", agentId)) setTransferOpen(false);
   }
 
-  async function insertCanned(item: CannedItem) {
-    if (!activeConversation || cannedInsertRef.current) return;
-    const conversationId = activeConversation.id;
-    const siteId = activeConversation.siteId;
-    cannedInsertRef.current = true;
-    setCannedInserting(true);
-    try {
-      appendCannedText(draftsRef.current[conversationId] ?? "", item.content);
-      const response = await fetch("/api/agent/canned", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: item.id, siteId }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || t("common.operationFailed"));
-      const next = appendCannedText(
-        draftsRef.current[conversationId] ?? "",
-        result.item.content,
-      );
-      setDrafts((previous) => ({ ...previous, [conversationId]: next }));
-      if (activeIdRef.current === conversationId) {
-        setCannedOpen(false);
-        setCannedQuery("");
-        requestAnimationFrame(() => composerRef.current?.focus());
-      }
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("common.operationFailed"),
-      );
-    } finally {
-      cannedInsertRef.current = false;
-      setCannedInserting(false);
-    }
-  }
-
   async function changeStatus(status: "ONLINE" | "AWAY" | "OFFLINE") {
     if (statusPending) return;
     setStatusPending(true);
@@ -1088,13 +850,6 @@ export function AgentWorkbench({
     }
   }
 
-  function toggleMute() {
-    const next: SoundPresetId = prefs.soundPreset === "none" ? "chime" : "none";
-    // 这次点击本身就是用户手势，先解锁音频再试听
-    unlockAudio();
-    updatePreferences({ soundPreset: next });
-    if (next !== "none") playSound(next, prefs.soundVolume);
-  }
 
   async function handleLogout() {
     try {
@@ -1107,12 +862,6 @@ export function AgentWorkbench({
       toast.error(t("common.operationFailed"));
     }
   }
-
-  const cannedLoading = cannedOpen && cannedResult.key !== cannedKey;
-  const filteredCanned =
-    cannedResult.key === cannedKey ? cannedResult.items : [];
-  const cannedCategories =
-    cannedResult.siteId === cannedSiteId ? cannedResult.categories : [];
 
   return (
     <div className="flex h-dvh flex-col">
@@ -1204,37 +953,34 @@ export function AgentWorkbench({
                 aiSuggestion={aiSuggestion}
                 aiTrace={aiTrace}
                 newMessagesBelow={newMessagesBelow}
-                cannedOpen={cannedOpen}
-                cannedQuery={cannedQuery}
-                cannedCategory={cannedCategory}
-                cannedCategories={cannedCategories}
-                cannedLoading={cannedLoading}
-                cannedError={Boolean(cannedResult.error)}
-                cannedItems={filteredCanned}
-                cannedInserting={cannedInserting}
-                cannedHasMore={cannedResult.hasMore}
+                cannedOpen={canned.open}
+                cannedQuery={canned.query}
+                cannedCategory={canned.category}
+                cannedCategories={canned.categories}
+                cannedLoading={canned.loading}
+                cannedError={canned.error}
+                cannedItems={canned.items}
+                cannedInserting={canned.inserting}
+                cannedHasMore={canned.hasMore}
                 onDraftChange={setDraft}
                 onTypingActivity={noteTypingActivity}
                 onScrollToLatest={scrollToLatest}
-                onUseSuggestion={() => {
-                  setDraft((previous) =>
-                    previous ? `${previous}\n${aiSuggestion ?? ""}` : (aiSuggestion ?? ""),
-                  );
-                  setSuggestion(null);
-                  setAiTrace(null);
-                }}
-                onDismissSuggestion={() => {
-                  setSuggestion(null);
-                  setAiTrace(null);
-                }}
+                onUseSuggestion={() =>
+                  applySuggestion((text) =>
+                    setDraft((previous) =>
+                      previous ? `${previous}\n${text}` : text,
+                    ),
+                  )
+                }
+                onDismissSuggestion={clearSuggestion}
                 onModelChange={(value) =>
                   updatePreferences({ preferredModel: value })
                 }
                 onGenerateSuggestion={() => void generateSuggestion()}
-                onCannedOpenChange={changeCannedOpen}
-                onCannedQueryChange={setCannedQuery}
-                onCannedCategoryChange={setCannedCategory}
-                onInsertCanned={insertCanned}
+                onCannedOpenChange={canned.setOpen}
+                onCannedQueryChange={canned.setQuery}
+                onCannedCategoryChange={canned.setCategory}
+                onInsertCanned={canned.insert}
                 onUploadFile={uploadFile}
                 onSend={() => void sendMessage()}
                 onPaste={(event) => void handlePaste(event)}
