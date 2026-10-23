@@ -153,6 +153,12 @@ const { HomeFaqFields } = loadUiModule(
 const { HomePlanFields } = loadUiModule(
   "src/app/admin/homepage/home-plan-fields.tsx",
 );
+const { AiTabsHeader } = loadUiModule(
+  "src/app/admin/ai/ai-tabs-header.tsx",
+);
+const { AiKnowledgeDeleteDialog } = loadUiModule(
+  "src/app/admin/ai/ai-knowledge-delete-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -515,6 +521,45 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("AI client split toolbar switches connection and knowledge actions", () => {
+  const connection = renderUi(AiTabsHeader, {
+    tab: "connection",
+    entryCount: 2,
+    reindexing: null,
+    testing: false,
+    saving: false,
+    onReindexAll: noop,
+    onNewEntry: noop,
+    onTest: noop,
+    onSave: noop,
+  });
+  assert.match(connection, /ai\.tabConnection/);
+  assert.match(connection, /ai\.test/);
+  assert.match(connection, /ai\.save/);
+
+  const knowledge = renderUi(AiTabsHeader, {
+    tab: "knowledge",
+    entryCount: 2,
+    reindexing: null,
+    testing: false,
+    saving: false,
+    onReindexAll: noop,
+    onNewEntry: noop,
+    onTest: noop,
+    onSave: noop,
+  });
+  assert.match(knowledge, /ai\.reindex/);
+  assert.match(knowledge, /ai\.knowledgeNew/);
+
+  const remove = renderUi(AiKnowledgeDeleteDialog, {
+    open: true,
+    onOpenChange: noop,
+    onConfirm: noop,
+  });
+  assert.match(remove, /common\.deleteConfirm/);
+  assert.match(remove, /common\.confirm/);
 });
 
 test("home editor split components render copy, features, FAQs and plans", () => {

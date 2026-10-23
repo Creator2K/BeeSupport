@@ -205,7 +205,7 @@ export function AiKnowledgeTab({
                 <Input
                   id="kb-keywords"
                   value={draft.keywords}
-                  placeholder="??, ??, ???"
+                  placeholder="价格, 套餐, 退款"
                   onChange={(event) =>
                     onDraftChange({ ...draft, keywords: event.target.value })
                   }
