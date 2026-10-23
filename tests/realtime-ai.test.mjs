@@ -173,7 +173,13 @@ test("a newer visitor message supersedes an in-flight AI answer", async () => {
 });
 
 async function socketFixture({ anonymous = false } = {}) {
-  const state = { enabled: !anonymous, typed: [], disconnected: false };
+  const state = {
+    enabled: !anonymous,
+    typed: [],
+    disconnected: false,
+    resolveCalls: 0,
+    conversationLookups: 0,
+  };
   const current = {
     id: "a1",
     siteIds: ["s1"],
@@ -213,11 +219,18 @@ async function socketFixture({ anonymous = false } = {}) {
     },
     in: () => ({ fetchSockets: async () => [] }),
   };
+  const previousIdentityTtl = process.env.SOCKET_IDENTITY_TTL_MS;
+  const previousConversationTtl = process.env.SOCKET_CONVERSATION_TTL_MS;
+  process.env.SOCKET_IDENTITY_TTL_MS = "50";
+  process.env.SOCKET_CONVERSATION_TTL_MS = "50";
   const module = loadModule("src/server/socket.ts", {
     "../lib/auth": {
       ...auth,
       SESSION_COOKIE: "session",
-      resolveUserFromToken: async () => (state.enabled ? current : null),
+      resolveUserFromToken: async () => {
+        state.resolveCalls += 1;
+        return state.enabled ? current : null;
+      },
     },
     "../lib/db": {
       prisma: {
@@ -226,11 +239,14 @@ async function socketFixture({ anonymous = false } = {}) {
           updateMany: async () => ({ count: 1 }),
         },
         conversation: {
-          findUnique: async ({ where }) => ({
-            id: where.id,
-            siteId: where.id === "own" ? "s1" : "s2",
-            visitorId: "v1",
-          }),
+          findUnique: async ({ where }) => {
+            state.conversationLookups += 1;
+            return {
+              id: where.id,
+              siteId: where.id === "own" ? "s1" : "s2",
+              visitorId: "v1",
+            };
+          },
         },
       },
     },
@@ -262,7 +278,14 @@ async function socketFixture({ anonymous = false } = {}) {
       markVisitorOnline: async () => {},
       markVisitorOffline: async () => {},
     },
+    "./ttl-cache": loadModule("src/server/ttl-cache.ts"),
   });
+  if (previousIdentityTtl === undefined)
+    delete process.env.SOCKET_IDENTITY_TTL_MS;
+  else process.env.SOCKET_IDENTITY_TTL_MS = previousIdentityTtl;
+  if (previousConversationTtl === undefined)
+    delete process.env.SOCKET_CONVERSATION_TTL_MS;
+  else process.env.SOCKET_CONVERSATION_TTL_MS = previousConversationTtl;
   module.registerRealtime(io);
   const established = new Promise((resolve, reject) =>
     authenticate(socket, (error) => (error ? reject(error) : resolve())),
@@ -290,19 +313,34 @@ test("anonymous sockets are rejected before joining any room", async () => {
   await socketFixture({ anonymous: true });
 });
 
-test("typing enforces site access and rechecks revocation", async () => {
+test("typing caches identity and conversation access, then rechecks revocation", async () => {
   const { state, send, close } = await socketFixture();
   try {
+    const initialResolveCalls = state.resolveCalls;
+    const initialLookups = state.conversationLookups;
+
     await send("typing", { conversationId: "other", isTyping: true });
     assert.equal(state.typed.length, 0);
+    assert.equal(state.conversationLookups, initialLookups + 1);
+    assert.equal(state.resolveCalls, initialResolveCalls);
+
     await send("typing", { conversationId: "own", isTyping: true });
     assert.equal(state.typed.length, 1);
+    assert.equal(state.conversationLookups, initialLookups + 2);
+
+    const cachedLookups = state.conversationLookups;
+    await send("typing", { conversationId: "own", isTyping: false });
+    assert.equal(state.typed.length, 2);
+    assert.equal(state.conversationLookups, cachedLookups);
+    assert.equal(state.resolveCalls, initialResolveCalls);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
     state.enabled = false;
     await assert.rejects(
       send("typing", { conversationId: "own", isTyping: true }),
       /Unauthorized/,
     );
-    assert.equal(state.typed.length, 1);
+    assert.equal(state.typed.length, 2);
     assert.equal(state.disconnected, true);
   } finally {
     close();

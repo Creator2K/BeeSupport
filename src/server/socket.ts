@@ -17,6 +17,7 @@ import {
 import { rooms } from "../lib/realtime/rooms";
 import { verifyVisitorToken, type VisitorSession } from "../lib/visitor-auth";
 import { createClientIpResolver } from "./client-ip";
+import { createTtlCache } from "./ttl-cache";
 import { assertIpAllowed } from "./services/risk";
 import { rateLimit } from "../lib/rate-limit";
 import {
@@ -34,6 +35,24 @@ type EventPayload = {
   isTyping?: unknown;
   status?: unknown;
 };
+type ConversationAccess = {
+  id: string;
+  siteId: string;
+  visitorId: string;
+};
+
+function ttlFromEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0
+    ? Math.min(value, 60_000)
+    : fallback;
+}
+
+const SOCKET_IDENTITY_TTL_MS = ttlFromEnv("SOCKET_IDENTITY_TTL_MS", 5_000);
+const SOCKET_CONVERSATION_TTL_MS = ttlFromEnv(
+  "SOCKET_CONVERSATION_TTL_MS",
+  5_000,
+);
 
 async function authenticate(socket: Socket): Promise<Identity> {
   const token = (socket.handshake.auth as { token?: string } | undefined)
@@ -74,6 +93,18 @@ export function registerRealtime(io: Server): void {
 
   io.on("connection", (socket) => {
     const identity = socket.data.identity as Identity;
+    const identityCache = createTtlCache<string, Identity>({
+      ttlMs: SOCKET_IDENTITY_TTL_MS,
+      maxEntries: 1,
+    });
+    identityCache.set("identity", identity);
+    const conversationCache = createTtlCache<
+      string,
+      ConversationAccess | null
+    >({
+      ttlMs: SOCKET_CONVERSATION_TTL_MS,
+      maxEntries: 128,
+    });
     const fingerprint = (value: Identity) =>
       JSON.stringify([
         value.user?.id,
@@ -85,9 +116,14 @@ export function registerRealtime(io: Server): void {
         value.visitor?.visitorId,
       ]);
     const original = fingerprint(identity);
-    const refreshIdentity = async () => {
-      const fresh = await authenticate(socket);
+    const refreshIdentity = async (force = false) => {
+      const fresh = await identityCache.getOrLoad(
+        "identity",
+        () => authenticate(socket),
+        force,
+      );
       if ((!fresh.user && !fresh.visitor) || fingerprint(fresh) !== original) {
+        conversationCache.clear();
         socket.emit("session:revoked");
         socket.disconnect(true);
         throw new Error("Session revoked");
@@ -95,7 +131,8 @@ export function registerRealtime(io: Server): void {
       socket.data.identity = fresh;
       return fresh;
     };
-    // Validate expiry and revocation for every incoming event, including typing.
+    // Every event reuses a short-lived identity snapshot. Privilege-changing
+    // actions actively disconnect sockets, so the TTL only bounds passive drift.
     socket.use((_packet, next) => {
       void refreshIdentity()
         .then(() => next())
@@ -141,8 +178,8 @@ export function registerRealtime(io: Server): void {
         await markVisitorOnline(identity.visitor.visitorId);
         emitVisitorPresence(identity.visitor.visitorId, true);
       }
-      // Recheck after asynchronous initialization in case revocation raced the handshake.
-      await refreshIdentity();
+      // Force one DB-backed validation after asynchronous initialization.
+      await refreshIdentity(true);
       socket.emit("session:ready");
     })();
     void initialized.catch((error: unknown) => {
@@ -176,10 +213,14 @@ export function registerRealtime(io: Server): void {
         conversationId.length > 128
       )
         return null;
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
-        select: { id: true, siteId: true, visitorId: true },
-      });
+      const conversation = await conversationCache.getOrLoad(
+        conversationId,
+        () =>
+          prisma.conversation.findUnique({
+            where: { id: conversationId },
+            select: { id: true, siteId: true, visitorId: true },
+          }),
+      );
       if (!conversation) return null;
       const current = socket.data.identity as Identity;
       return (current.user &&
@@ -246,7 +287,7 @@ export function registerRealtime(io: Server): void {
       if (renewing) return;
       renewing = true;
       void initialized
-        .then(refreshIdentity)
+        .then(() => refreshIdentity(true))
         .then(async (current) => {
           if (!socket.connected) return;
           if (current.user) {
@@ -266,6 +307,8 @@ export function registerRealtime(io: Server): void {
 
     socket.on("disconnect", () => {
       clearInterval(timer);
+      identityCache.clear();
+      conversationCache.clear();
       void initialized
         .catch(() => undefined)
         .then(async () => {

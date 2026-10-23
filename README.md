@@ -300,6 +300,8 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
 | `APP_URL`                                       | ✅   | 对外访问地址，用于嵌入代码与邮件链接；https 时 cookie 自动加 `secure`          |
 | `ADMIN_PATH`                                    | ➖   | 管理后台入口路径，默认 `/admin`；建议改随机串，如 `/console-82553547`          |
 | `REDIS_URL`                                     | ➖   | 配置后启用跨实例广播与 Redis 限流；不配置则单实例内存实现                      |
+| `SOCKET_IDENTITY_TTL_MS` | ➖ | 身份复核间隔，默认 5000毫秒，上限 60000 |
+| `SOCKET_CONVERSATION_TTL_MS` | ➖ | 会话访问缓存间隔，默认 5000毫秒，上限 60000 |
 | `PORT`                                          | ➖   | 监听端口，默认 3000                                                            |
 | `UPLOAD_DIR`                                    | ➖   | 上传目录，默认 `./data/uploads`，容器内 `/app/data/uploads`                    |
 | `UPLOAD_MAX_BYTES`                              | ➖   | 单文件上限，默认 20MB                                                          |
@@ -385,6 +387,7 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
 | C→S  | `typing` / `agent:status` / `visitor:ping`      | 输入中、状态切换、访客心跳              |
 
 房间约定：`conversation:<id>`、`agent:<userId>`、`site:<siteId>:agents`、`visitor:<visitorId>`。
+身份与会话访问结果在单个 Socket 连接内短期复用（默认 5 秒），减少输入状态等高频事件的数据库查询；停用、密码变更和角色变更仍会主动断开对应连接。
 普通消息同时投递到「会话房间」与「访客个人房间」（访客端不依赖 join 时机）；
 **内部备注只发会话房间**，访客既收不到实时事件，也读不到历史里的 `NOTE`。
 
