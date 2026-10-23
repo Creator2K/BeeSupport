@@ -102,6 +102,18 @@ const { SubscriptionPlanCard } = loadUiModule(
 const { SubscriptionOrderDialog } = loadUiModule(
   "src/components/admin/subscription-order-dialog.tsx",
 );
+const { RiskRuleTable } = loadUiModule(
+  "src/app/admin/risk/risk-rule-table.tsx",
+);
+const { RiskEventsTable } = loadUiModule(
+  "src/app/admin/risk/risk-events-table.tsx",
+);
+const { RiskRuleDialog } = loadUiModule(
+  "src/app/admin/risk/risk-rule-dialog.tsx",
+);
+const { RiskDeleteDialog } = loadUiModule(
+  "src/app/admin/risk/risk-delete-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -464,6 +476,83 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("risk split components render rules, events, editor and delete confirmation", () => {
+  const site = { id: "site-1", name: "Demo Site" };
+  const rule = {
+    id: "rule-1",
+    kind: "WORD",
+    value: "blocked-word",
+    siteId: site.id,
+    siteName: site.name,
+    note: "Keep visitors safe",
+    active: true,
+    expiresAt: "2026-11-01T00:00:00.000Z",
+    expiryLabel: "2026-11-01 08:00",
+    expired: false,
+    updatedAt: "2026-10-23T09:00:00.000Z",
+  };
+  const table = renderUi(RiskRuleTable, {
+    rules: [rule],
+    sites: [site],
+    filters: { kind: "", siteId: "", query: "" },
+    page: 1,
+    total: 21,
+    previous: "#",
+    next: "/admin/risk?page=2",
+    pending: false,
+    onAdd: noop,
+    onEdit: noop,
+    onToggle: noop,
+    onDelete: noop,
+  });
+  assert.match(table, /blocked-word/);
+  assert.match(table, /\u751f\u6548\u4e2d/);
+  assert.match(table, /\u7b2c 1 \/ 2 \u9875/);
+
+  const events = renderUi(RiskEventsTable, {
+    events: [
+      {
+        id: "event-1",
+        kind: "IP",
+        ruleValue: "203.0.113.10",
+        ip: "198.51.100.8",
+        siteName: site.name,
+        visitorId: "visitor-1",
+        context: "{}",
+        createdAt: "2026-10-23T09:00:00.000Z",
+        createdLabel: "2026-10-23 17:00",
+      },
+    ],
+    basePath: "/admin/risk",
+    page: 1,
+    total: 1,
+    previous: "#",
+    next: "#",
+  });
+  assert.match(events, /198\.51\.100\.8/);
+  assert.match(events, /\u67e5\u770b\u753b\u50cf/);
+  assert.match(events, /\/admin\/visitors\/visitor-1/);
+
+  const editor = renderUi(RiskRuleDialog, {
+    rule: null,
+    initialIp: "203.0.113.10",
+    initialSiteId: site.id,
+    sites: [site],
+    onClose: noop,
+  });
+  assert.match(editor, /id="risk-kind"/);
+  assert.match(editor, /id="risk-values"/);
+  assert.match(editor, /\u4fdd\u5b58\u89c4\u5219/);
+
+  const remove = renderUi(RiskDeleteDialog, {
+    rule,
+    onClose: noop,
+    onDeleted: noop,
+  });
+  assert.match(remove, /\u5220\u9664\u8fd9\u6761\u89c4\u5219/);
+  assert.match(remove, /\u786e\u8ba4\u5220\u9664/);
 });
 
 test("branding split components render style controls, fields and preview", () => {

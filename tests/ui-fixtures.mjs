@@ -140,6 +140,7 @@ const brandingFields = loadModule(
   "src/components/admin/branding-fields.ts",
 );
 const brandingValue = loadModule("src/components/admin/branding-value.ts");
+const riskUi = loadModule("src/app/admin/risk/risk-ui.ts");
 
 const toast = Object.assign(() => {}, {
   success() {},
@@ -311,6 +312,15 @@ export const uiDependencies = {
     decideOrderAction: async () => ({ ok: true, message: "ok" }),
     submitOrderAction: async () => ({ ok: true, message: "ok" }),
   },
+  "@/server/actions/risk": {
+    deleteRiskRuleAction: async () => ({ ok: true, message: "ok" }),
+    saveRiskRuleAction: async () => ({ ok: true, message: "ok" }),
+    setRiskRuleActiveAction: async () => ({
+      ok: true,
+      message: "ok",
+      rule: { active: true, updatedAt: "2026-10-23T10:00:00.000Z" },
+    }),
+  },
   "./feature-summary": {
     FeatureSummary: () => React.createElement("span", null, "feature-summary"),
   },
@@ -337,6 +347,7 @@ export const uiDependencies = {
   "./visitor-insights-shared": visitorInsightsShared,
   "./branding-fields": brandingFields,
   "./branding-value": brandingValue,
+  "./risk-ui": riskUi,
   "./webhook-types": webhookTypes,
   "@/lib/admin-navigation": adminNavigation,
   "@/lib/visitor-env": {
@@ -347,6 +358,11 @@ export const uiDependencies = {
     }),
   },
 };
+
+uiDependencies["./risk-pagination"] = loadModule(
+  "src/app/admin/risk/risk-pagination.tsx",
+  uiDependencies,
+);
 
 export function loadUiModule(filename) {
   return loadModule(filename, uiDependencies);
