@@ -144,6 +144,9 @@ const riskUi = loadModule("src/app/admin/risk/risk-ui.ts");
 const siteFormValues = loadModule(
   "src/app/admin/sites/site-form-values.ts",
 );
+const merchantTypes = loadModule(
+  "src/app/admin/merchants/merchant-types.ts",
+);
 
 const toast = Object.assign(() => {}, {
   success() {},
@@ -308,6 +311,14 @@ export const uiDependencies = {
     BrandingEditor: () =>
       React.createElement("span", null, "branding-editor"),
   },
+  "@/components/admin/feature-controls": {
+    FeatureControls: () =>
+      React.createElement("span", null, "feature-controls"),
+  },
+  "@/lib/entitlements": {
+    BASIC_FEATURES: {},
+    readFeatures: (features) => features ?? {},
+  },
   "@/lib/clipboard": { copyText: async () => true },
   "@/lib/subscriptions": {
     formatPrice: (cents) => `?${(cents / 100).toFixed(2)}`,
@@ -392,6 +403,7 @@ export const uiDependencies = {
   "./branding-value": brandingValue,
   "./risk-ui": riskUi,
   "./site-form-values": siteFormValues,
+  "./merchant-types": merchantTypes,
   "./webhook-types": webhookTypes,
   "@/lib/admin-navigation": adminNavigation,
   "@/lib/visitor-env": {

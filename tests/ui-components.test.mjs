@@ -173,6 +173,12 @@ const { SiteEmbedDialog } = loadUiModule(
 const { SiteDeleteDialog } = loadUiModule(
   "src/app/admin/sites/site-delete-dialog.tsx",
 );
+const { MerchantCard } = loadUiModule(
+  "src/app/admin/merchants/merchant-card.tsx",
+);
+const { MerchantDialog } = loadUiModule(
+  "src/app/admin/merchants/merchant-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -535,6 +541,66 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("merchant split components render usage cards and management form", () => {
+  const tenant = {
+    id: "tenant-1",
+    managementVersion: 2,
+    name: "Demo Merchant",
+    slug: "demo",
+    status: "ACTIVE",
+    planName: "Pro",
+    expiresAt: null,
+    maxAgents: 10,
+    maxSites: 3,
+    monthlyConversations: 5000,
+    storageMB: 2048,
+    contactEmail: "owner@example.test",
+    note: "Internal",
+    features: {},
+    usage: {
+      agents: 4,
+      sites: 2,
+      conversations: 1000,
+      storageBytes: 1048576,
+    },
+  };
+  const card = renderUi(MerchantCard, { tenant, onEdit: noop });
+  assert.match(card, /Demo Merchant/);
+  assert.match(card, /4 \/ 10/);
+  assert.match(card, /\u957f\u671f\u6709\u6548/);
+
+  const form = {
+    name: tenant.name,
+    slug: tenant.slug,
+    status: tenant.status,
+    planName: tenant.planName,
+    expiresAt: tenant.expiresAt,
+    maxAgents: tenant.maxAgents,
+    maxSites: tenant.maxSites,
+    monthlyConversations: tenant.monthlyConversations,
+    storageMB: tenant.storageMB,
+    contactEmail: tenant.contactEmail,
+    note: tenant.note,
+    features: {},
+  };
+  const dialog = renderUi(MerchantDialog, {
+    open: true,
+    editing: false,
+    form,
+    owner: { ownerName: "", ownerEmail: "", ownerPassword: "" },
+    pending: false,
+    error: "",
+    onOpenChange: noop,
+    onFormChange: noop,
+    onOwnerChange: noop,
+    onSubmit: noop,
+  });
+  assert.match(dialog, /id="merchant-name"/);
+  assert.match(dialog, /id="ownerEmail"/);
+  assert.match(dialog, /feature-controls/);
+  assert.match(dialog, /\u4fdd\u5b58\u5546\u5bb6\u53ca\u5957\u9910/);
 });
 
 test("site admin split components render table, embed code and delete flow", () => {
