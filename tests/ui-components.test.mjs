@@ -123,6 +123,15 @@ const { SiteWorkHoursFields } = loadUiModule(
 const { SiteBrandingSection } = loadUiModule(
   "src/app/admin/sites/site-branding-section.tsx",
 );
+const { ConversationFilters } = loadUiModule(
+  "src/app/admin/conversations/conversation-filters.tsx",
+);
+const { ConversationListTable } = loadUiModule(
+  "src/app/admin/conversations/conversation-list-table.tsx",
+);
+const { ConversationDetailDialog } = loadUiModule(
+  "src/app/admin/conversations/conversation-detail-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -485,6 +494,83 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("conversation split components render filters, list and detail shell", () => {
+  const conversation = {
+    id: "conversation-1",
+    siteId: "site-1",
+    siteName: "Demo Site",
+    status: "OPEN",
+    source: "WIDGET",
+    subject: null,
+    tags: [],
+    note: null,
+    priority: 0,
+    lastMessageAt: "2026-10-23T09:00:00.000Z",
+    lastMessagePreview: "Hello",
+    unreadForAgent: 0,
+    unreadForVisitor: 0,
+    firstResponseAt: null,
+    rating: 5,
+    ratingComment: "Great support",
+    closedAt: null,
+    createdAt: "2026-10-23T08:00:00.000Z",
+    visitor: {
+      id: "visitor-1",
+      email: "visitor@example.test",
+      name: "Demo Visitor",
+      lastSeenAt: "2026-10-23T09:00:00.000Z",
+      firstSeenAt: "2026-10-23T08:00:00.000Z",
+      online: true,
+      meta: null,
+      visitCount: 1,
+      pageViews: 2,
+      landingPage: "/",
+      lastPage: "/pricing",
+      lastPageTitle: "Pricing",
+      referrer: null,
+      profileTags: [],
+      profileNote: null,
+      blocked: false,
+    },
+    assignedAgent: {
+      id: "agent-1",
+      name: "Agent One",
+      email: "agent@example.test",
+      avatarUrl: null,
+    },
+    messageCount: 3,
+  };
+
+  const filters = renderUi(ConversationFilters, {
+    filters: { status: "", siteId: "", query: "" },
+    sites: [{ id: "site-1", name: "Demo Site" }],
+    total: 1,
+    onApply: noop,
+  });
+  assert.match(filters, /conversations\.searchPlaceholder/);
+  assert.match(filters, /Demo Site/);
+  assert.match(filters, /common\.total/);
+
+  const list = renderUi(ConversationListTable, {
+    items: [conversation],
+    page: 1,
+    totalPages: 2,
+    onOpen: noop,
+    onPageChange: noop,
+  });
+  assert.match(list, /Demo Visitor/);
+  assert.match(list, /visitor@example\.test/);
+  assert.match(list, /conversations\.statusOpen/);
+  assert.match(list, /Agent One/);
+
+  const detail = renderUi(ConversationDetailDialog, {
+    conversationId: null,
+    onClose: noop,
+  });
+  assert.match(detail, /conversations\.detail/);
+  assert.match(detail, /common\.loading/);
 });
 
 test("site form split components render settings, work hours and branding", () => {

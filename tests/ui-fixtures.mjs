@@ -353,6 +353,17 @@ export const uiDependencies = {
     formatRelative: () => "2 minutes ago",
     formatDateTime: () => "2026-10-23 09:00",
     formatClock: () => "09:00:00",
+    formatBytes: (bytes) => `${bytes} B`,
+  },
+  "@/lib/realtime/messages": {
+    mergeMessages: (previous, next) => [...previous, ...next],
+  },
+  "@/lib/realtime/use-chat-scroll": {
+    useChatScroll: () => ({
+      scrollRef: { current: null },
+      onScroll() {},
+      preserveHistoryPosition() {},
+    }),
   },
   "./visitor-panel-shared": visitorPanelShared,
   "./visitor-insights-shared": visitorInsightsShared,
