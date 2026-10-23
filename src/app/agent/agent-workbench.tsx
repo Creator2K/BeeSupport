@@ -25,15 +25,9 @@ import {
   mergeMessages,
   snapshotHasOlderMessages,
 } from "@/lib/realtime/messages";
-import {
-  prepareSendAttempt,
-  type SendAttempt,
-} from "@/lib/realtime/send-attempt";
-import { listTransferTargetsAction } from "@/server/actions/agents";
 import { cn } from "@/lib/utils";
 import { ConversationHeader } from "@/components/agent/conversation-header";
 import type {
-  TransferTarget,
   WorkbenchMe,
 } from "@/components/agent/workbench-types";
 import { WorkbenchDialogs } from "@/components/agent/workbench-dialogs";
@@ -43,6 +37,8 @@ import { WorkbenchMessageThread } from "@/components/agent/workbench-message-thr
 import { useWorkbenchPreferences } from "./use-workbench-preferences";
 import { useWorkbenchAi } from "./use-workbench-ai";
 import { useWorkbenchCanned } from "./use-workbench-canned";
+import { useWorkbenchMessaging } from "./use-workbench-messaging";
+import { useWorkbenchActions } from "./use-workbench-actions";
 
 export type { WorkbenchMe } from "@/components/agent/workbench-types";
 
@@ -145,24 +141,11 @@ export function AgentWorkbench({
       [id]: typeof value === "function" ? value(previous[id] ?? "") : value,
     }));
   }
-  const sendAttemptsRef = useRef(new Map<string, SendAttempt>());
-  const sendingRef = useRef(false);
-  const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [typingConversationId, setTypingConversationId] = useState<
     string | null
   >(null);
-  const [agentStatus, setAgentStatus] = useState(me.status);
-  const [statusPending, setStatusPending] = useState(false);
   const { prefs, updatePreferences, alertUser, toggleMute } =
     useWorkbenchPreferences(initialPreferences);
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [targetsLoading, setTargetsLoading] = useState(false);
-  const [targetsError, setTargetsError] = useState(false);
-  const [actionPending, setActionPending] = useState(false);
-  const actionPendingRef = useRef(false);
-  const [targets, setTargets] = useState<TransferTarget[]>([]);
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(
     Boolean(initialConversationId),
   );
@@ -185,8 +168,6 @@ export function AgentWorkbench({
     ai,
     preferredModel: prefs.preferredModel,
   });
-  const typingSentAtRef = useRef(0);
-  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeConversation = useMemo(
     () =>
@@ -245,6 +226,28 @@ export function AgentWorkbench({
     },
     [],
   );
+
+  const {
+    transferOpen,
+    setTransferOpen,
+    targetsLoading,
+    targetsError,
+    actionPending,
+    targets,
+    closeConfirmOpen,
+    setCloseConfirmOpen,
+    agentStatus,
+    setAgentStatus,
+    statusPending,
+    runAction,
+    openTransfer,
+    transferTo,
+    changeStatus,
+  } = useWorkbenchActions({
+    activeId,
+    upsertConversation,
+    initialStatus: me.status,
+  });
 
   const appendMessage = useCallback(
     (conversationId: string, message: SerializedMessage) => {
@@ -309,6 +312,27 @@ export function AgentWorkbench({
     },
     [upsertConversation, t],
   );
+
+  const {
+    sending,
+    uploading,
+    sendMessage,
+    uploadFile,
+    handlePaste,
+    noteTypingActivity,
+  } = useWorkbenchMessaging({
+    activeId,
+    activeIdRef,
+    activeConversation,
+    me,
+    draft,
+    setDraft,
+    setMessages,
+    appendMessage,
+    loadMessages,
+    scrollToLatest,
+    socket,
+  });
 
   const markRead = useCallback(async (conversationId: string) => {
     setConversations((prev) =>
@@ -563,6 +587,7 @@ export function AgentWorkbench({
     appendMessage,
     markRead,
     alertUser,
+    setAgentStatus,
     me.id,
   ]);
 
@@ -586,270 +611,6 @@ export function AgentWorkbench({
       window.history.replaceState(null, "", `/agent?c=${id}`);
     }
   }
-
-  function emitTyping(isTyping: boolean) {
-    if (!socket || !activeId) return;
-    const now = Date.now();
-    if (isTyping && now - typingSentAtRef.current < 2000) return;
-    typingSentAtRef.current = now;
-    socket.emit("typing", { conversationId: activeId, isTyping });
-  }
-
-  function noteTypingActivity() {
-    emitTyping(true);
-    if (typingStopTimerRef.current) {
-      clearTimeout(typingStopTimerRef.current);
-    }
-    typingStopTimerRef.current = setTimeout(() => emitTyping(false), 2500);
-  }
-
-  async function sendMessage() {
-    const body = draft.trim();
-    if (!body || !activeId || sendingRef.current) return;
-
-    const attempt = prepareSendAttempt(
-      sendAttemptsRef.current.get(activeId) ?? null,
-      activeId,
-      body,
-    );
-    sendAttemptsRef.current.set(activeId, attempt);
-    const { clientId } = attempt;
-    sendingRef.current = true;
-
-    const optimistic: SerializedMessage = {
-      id: `tmp-${clientId}`,
-      conversationId: activeId,
-      sender: "AGENT",
-      type: "TEXT",
-      body,
-      authorId: me.id,
-      authorName: me.name,
-      createdAt: new Date().toISOString(),
-      readByAgentAt: new Date().toISOString(),
-      readByVisitorAt: null,
-      clientId,
-      attachments: [],
-      meta: null,
-    };
-
-    scrollToLatest();
-    appendMessage(activeId, optimistic);
-    setDraft("");
-    setSending(true);
-    emitTyping(false);
-
-    try {
-      const response = await fetch(
-        `/api/agent/conversations/${activeId}/messages`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ body, clientId }),
-        },
-      );
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast.error(data.error ?? t("common.operationFailed"));
-        setMessages((prev) => ({
-          ...prev,
-          [activeId]: (prev[activeId] ?? []).filter(
-            (item) => item.id !== `tmp-${clientId}`,
-          ),
-        }));
-        setDraft((current) => current || body);
-      } else {
-        sendAttemptsRef.current.delete(activeId);
-        window.dispatchEvent(new Event("beesupport:followups-changed"));
-        await loadMessages(activeId, true);
-      }
-    } catch {
-      toast.error(t("common.operationFailed"));
-      setMessages((previous) => ({
-        ...previous,
-        [activeId]: (previous[activeId] ?? []).filter(
-          (message) => message.id !== `tmp-${clientId}`,
-        ),
-      }));
-      setDraft((current) => current || body);
-    } finally {
-      sendingRef.current = false;
-      setSending(false);
-    }
-  }
-
-  async function uploadFile(file: File): Promise<boolean> {
-    if (!activeId || !activeConversation) return false;
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.set("file", file);
-      formData.set("siteId", activeConversation.siteId);
-      formData.set("conversationId", activeId);
-
-      const upload = await fetch("/api/agent/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!upload.ok) {
-        const data = (await upload.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast.error(data.error ?? t("widget.uploadFailed"));
-        return false;
-      }
-      const uploaded = (await upload.json()) as {
-        attachment: { id: string };
-      };
-
-      const response = await fetch(
-        `/api/agent/conversations/${activeId}/messages`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            body: "",
-            attachmentIds: [uploaded.attachment.id],
-          }),
-        },
-      );
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast.error(data.error ?? t("widget.sendFailed"));
-      } else {
-        if (activeIdRef.current === activeId) scrollToLatest();
-        window.dispatchEvent(new Event("beesupport:followups-changed"));
-        await loadMessages(activeId, true);
-        return true;
-      }
-    } catch {
-      toast.error(t("widget.uploadFailed"));
-    } finally {
-      setUploading(false);
-    }
-    return false;
-  }
-
-  /** 从剪贴板里挑出文件（截图粘贴会以 file 形式出现） */
-  function extractFiles(list: DataTransferItemList | null | undefined): File[] {
-    if (!list) return [];
-    const files: File[] = [];
-    for (let index = 0; index < list.length; index += 1) {
-      const item = list[index];
-      if (item && item.kind === "file") {
-        const file = item.getAsFile();
-        if (file) files.push(file);
-      }
-    }
-    return files;
-  }
-
-  async function handlePaste(
-    event: React.ClipboardEvent<HTMLTextAreaElement>,
-  ): Promise<void> {
-    const files = extractFiles(event.clipboardData?.items);
-    if (files.length === 0) return;
-
-    event.preventDefault();
-    let allSucceeded = true;
-    for (const file of files.slice(0, 4)) {
-      allSucceeded = (await uploadFile(file)) && allSucceeded;
-    }
-    if (allSucceeded) toast.success(t("widget.imageAttached"));
-  }
-
-  async function runAction(
-    action: "claim" | "close" | "reopen" | "transfer",
-    targetAgentId?: string,
-  ): Promise<boolean> {
-    if (!activeId || actionPendingRef.current) return false;
-    actionPendingRef.current = true;
-    setActionPending(true);
-    try {
-      const response = await fetch(
-        `/api/agent/conversations/${activeId}/actions`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action, targetAgentId }),
-        },
-      );
-      const data = (await response.json()) as {
-        conversation?: SerializedConversation;
-        error?: string;
-      };
-      if (!response.ok) {
-        toast.error(data.error ?? t("common.operationFailed"));
-        return false;
-      }
-      if (data.conversation) upsertConversation(data.conversation);
-      window.dispatchEvent(new Event("beesupport:followups-changed"));
-      toast.success(
-        action === "claim"
-          ? t("workbench.claimed")
-          : action === "close"
-            ? t("conversations.statusClosed")
-            : action === "transfer"
-              ? t("workbench.transferDone")
-              : t("workbench.reopen"),
-      );
-      return true;
-    } catch {
-      toast.error(t("common.operationFailed"));
-      return false;
-    } finally {
-      actionPendingRef.current = false;
-      setActionPending(false);
-    }
-  }
-
-  async function openTransfer() {
-    setTransferOpen(true);
-    setTargets([]);
-    setTargetsError(false);
-    setTargetsLoading(true);
-    try {
-      setTargets(await listTransferTargetsAction());
-    } catch {
-      setTargetsError(true);
-      toast.error(t("common.operationFailed"));
-    } finally {
-      setTargetsLoading(false);
-    }
-  }
-
-  async function transferTo(agentId: string) {
-    if (await runAction("transfer", agentId)) setTransferOpen(false);
-  }
-
-  async function changeStatus(status: "ONLINE" | "AWAY" | "OFFLINE") {
-    if (statusPending) return;
-    setStatusPending(true);
-    try {
-      const response = await fetch("/api/agent/status", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!response.ok) throw new Error("Status update failed");
-      setAgentStatus(status);
-      toast.success(
-        status === "ONLINE"
-          ? t("workbench.statusOnline")
-          : status === "AWAY"
-            ? t("workbench.statusAway")
-            : t("workbench.statusOffline"),
-      );
-    } catch {
-      toast.error(t("common.operationFailed"));
-    } finally {
-      setStatusPending(false);
-    }
-  }
-
 
   async function handleLogout() {
     try {

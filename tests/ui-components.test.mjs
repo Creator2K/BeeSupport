@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import React from "react";
 
 import { loadUiModule, renderUi } from "./ui-fixtures.mjs";
+import { loadModule } from "./load-module.mjs";
 
 const { WorkbenchHeader } = loadUiModule(
   "src/components/agent/workbench-header.tsx",
@@ -196,7 +197,22 @@ const { HomeSteps } = loadUiModule("src/components/home/home-steps.tsx");
 const { HomeFaq } = loadUiModule("src/components/home/home-faq.tsx");
 const { HomePlans } = loadUiModule("src/components/home/home-plans.tsx");
 
+const { extractClipboardFiles } = loadModule(
+  "src/app/agent/workbench-messaging-utils.ts",
+);
+
 const noop = () => {};
+
+test("workbench clipboard extraction ignores non-file items", () => {
+  const file = { name: "screenshot.png" };
+  const items = {
+    0: { kind: "file", getAsFile: () => file },
+    1: { kind: "string", getAsFile: () => null },
+    length: 2,
+  };
+  assert.deepEqual(extractClipboardFiles(items), [file]);
+  assert.deepEqual(extractClipboardFiles(null), []);
+});
 
 test("agent workbench split components keep key actions and states", () => {
   const me = {
