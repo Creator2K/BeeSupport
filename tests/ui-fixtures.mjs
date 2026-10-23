@@ -278,6 +278,14 @@ export const uiDependencies = {
         .filter(Boolean)
         .join(" "),
   },
+  "@/components/admin/copy-button": {
+    CopyButton: ({ label }) =>
+      React.createElement("button", null, label ?? "copy"),
+  },
+  "@/lib/color": {
+    accentGradient: () => "linear-gradient(#000, #333)",
+    readableTextColor: () => "#ffffff",
+  },
   "@/lib/launcher": {
     launcherForeground: () => "#ffffff",
     launcherStyleOptions: [
@@ -330,6 +338,8 @@ export const uiDependencies = {
   },
   "@/server/actions/sites": {
     createSiteAction: async () => ({ ok: true, message: "ok" }),
+    deleteSiteAction: async () => ({ ok: true, message: "ok" }),
+    toggleSiteActiveAction: async () => ({ ok: true, message: "ok" }),
     updateSiteAction: async () => ({ ok: true, message: "ok" }),
   },
   "@/server/actions/canned": {

@@ -32,7 +32,7 @@ import {
   type SiteFormState,
 } from "./site-form-values";
 import { SiteWorkHoursFields } from "./site-work-hours-fields";
-import type { SiteRecord } from "./sites-client";
+import type { SiteRecord } from "./site-types";
 
 export function SiteFormDialog({
   open,

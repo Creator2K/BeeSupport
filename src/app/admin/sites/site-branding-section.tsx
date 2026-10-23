@@ -6,7 +6,7 @@ import type {
   WidgetSettings,
 } from "@/lib/branding";
 
-import type { SiteRecord } from "./sites-client";
+import type { SiteRecord } from "./site-types";
 import type { UpdateSiteForm } from "./site-form-values";
 
 export function SiteBrandingSection({

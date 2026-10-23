@@ -166,6 +166,13 @@ const { AgentResetPasswordDialog } = loadUiModule(
 const { AgentDeleteDialog } = loadUiModule(
   "src/app/admin/agents/agent-delete-dialog.tsx",
 );
+const { SiteTable } = loadUiModule("src/app/admin/sites/site-table.tsx");
+const { SiteEmbedDialog } = loadUiModule(
+  "src/app/admin/sites/site-embed-dialog.tsx",
+);
+const { SiteDeleteDialog } = loadUiModule(
+  "src/app/admin/sites/site-delete-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -528,6 +535,73 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("site admin split components render table, embed code and delete flow", () => {
+  const site = {
+    canCustomizeFooter: true,
+    widgetSettings: {},
+    inheritedSettings: {
+      title: "Inherited",
+      logoUrl: "",
+      footerText: "Powered",
+      primaryColor: "#18181b",
+      position: "right",
+      launcherStyle: "bubble",
+      launcherLabel: "Chat",
+      imagesEnabled: true,
+      filesEnabled: true,
+      emojiEnabled: true,
+      ratingEnabled: true,
+      maxUploadMB: 10,
+    },
+    id: "site-1",
+    name: "Demo Site",
+    slug: "demo",
+    publicKey: "public-key-1234567890",
+    description: "Demo description",
+    primaryColor: "#336699",
+    position: "right",
+    welcomeMessage: "Welcome",
+    offlineMessage: "Offline",
+    requireEmail: true,
+    autoAssign: true,
+    imageReviewEnabled: false,
+    notifyEmail: null,
+    allowedOrigins: ["example.com"],
+    workHours: null,
+    active: true,
+    counts: { conversations: 12, visitors: 30, agents: 2 },
+    agentNames: ["Agent One"],
+  };
+  const table = renderUi(SiteTable, {
+    sites: [site],
+    pendingId: null,
+    onCreate: noop,
+    onEdit: noop,
+    onToggle: noop,
+    onEmbed: noop,
+    onDelete: noop,
+  });
+  assert.match(table, /Demo Site/);
+  assert.match(table, /public-key-123/);
+  assert.match(table, /example\.com/);
+
+  const embed = renderUi(SiteEmbedDialog, {
+    appUrl: "https://support.example.test/",
+    site,
+    onClose: noop,
+  });
+  assert.match(embed, /support\.example\.test\/widget\.js\?key=public-key-1234567890/);
+  assert.match(embed, /sites\.embedHint/);
+
+  const remove = renderUi(SiteDeleteDialog, {
+    site,
+    onClose: noop,
+    onDeleted: noop,
+  });
+  assert.match(remove, /sites\.deleteConfirm/);
+  assert.match(remove, /common\.confirm/);
 });
 
 test("agent split components render member table and account dialogs", () => {
