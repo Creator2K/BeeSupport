@@ -133,6 +133,10 @@ const visitorPanelShared = loadModule(
   { "react/jsx-runtime": require("react/jsx-runtime") },
 );
 
+const visitorInsightsShared = loadModule(
+  "src/components/admin/visitor-insights-shared.ts",
+);
+
 const toast = Object.assign(() => {}, {
   success() {},
   error() {},
@@ -304,6 +308,7 @@ export const uiDependencies = {
     formatClock: () => "09:00:00",
   },
   "./visitor-panel-shared": visitorPanelShared,
+  "./visitor-insights-shared": visitorInsightsShared,
   "./webhook-types": webhookTypes,
   "@/lib/admin-navigation": adminNavigation,
   "@/lib/visitor-env": {

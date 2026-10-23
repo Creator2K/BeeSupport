@@ -75,6 +75,18 @@ const { SubscriptionOrderCard } = loadUiModule(
 const { OrderDecisionDialog } = loadUiModule(
   "src/components/admin/order-decision-dialog.tsx",
 );
+const { VisitorMetricCards } = loadUiModule(
+  "src/components/admin/visitor-metric-cards.tsx",
+);
+const { VisitorTrend } = loadUiModule(
+  "src/components/admin/visitor-trend.tsx",
+);
+const { VisitorBreakdown } = loadUiModule(
+  "src/components/admin/visitor-breakdown.tsx",
+);
+const { VisitorSitesTable } = loadUiModule(
+  "src/components/admin/visitor-sites-table.tsx",
+);
 
 const noop = () => {};
 
@@ -335,6 +347,58 @@ test("subscription order card and decision dialog render order actions", () => {
   assert.match(dialog, /id="payment-reference"/);
   assert.match(dialog, /id="order-review-note"/);
   assert.ok(dialog.includes("\u786e\u8ba4\u6536\u6b3e\u5e76\u5f00\u901a"));
+});
+
+test("visitor insights split components render metrics, trend and breakdowns", () => {
+  const totals = {
+    visitors: 6,
+    visits: 12,
+    views: 30,
+    returning: 2,
+    consulted: 2,
+    active7: 4,
+    blocked: 1,
+  };
+  const metrics = renderUi(VisitorMetricCards, { totals });
+  assert.match(metrics, /\u7d2f\u8ba1\u8bbf\u5ba2/);
+  assert.match(metrics, /33\.3%/);
+  assert.match(metrics, /\u8eab\u4efd\u88ab\u5c01\u7981/);
+
+  const trend = renderUi(VisitorTrend, {
+    trend: [
+      { day: "2026-10-01", count: 1 },
+      { day: "2026-10-02", count: 2 },
+      { day: "2026-10-03", count: 3 },
+    ],
+    totalVisitors: totals.visitors,
+  });
+  assert.match(trend, /\u65b0\u589e\u8bbf\u5ba2\u8d8b\u52bf/);
+  assert.match(trend, /2026-10-01/);
+  assert.match(trend, /\u5408\u8ba1 6 \u4f4d\u65b0\u589e\u8bbf\u5ba2/);
+
+  const breakdown = renderUi(VisitorBreakdown, {
+    title: "Device",
+    rows: [{ label: "Mobile", count: 4 }],
+    total: totals.visitors,
+  });
+  assert.match(breakdown, /66\.7%/);
+  assert.match(breakdown, /\u5176\u4ed6/);
+
+  const sites = renderUi(VisitorSitesTable, {
+    adminPath: "/console-test",
+    sites: [
+      {
+        id: "site-1",
+        name: "Demo Site",
+        visitors: 6,
+        visits: 12,
+        views: 30,
+        consulted: 2,
+      },
+    ],
+  });
+  assert.match(sites, /Demo Site/);
+  assert.match(sites, /\/console-test\/visitors\?siteId=site-1/);
 });
 
 test("WeChat login split components render status, actions and config", () => {
