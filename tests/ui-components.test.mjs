@@ -45,6 +45,12 @@ const { AiPromptTab } = loadUiModule("src/app/admin/ai/ai-prompt-tab.tsx");
 const { AiKnowledgeTab } = loadUiModule(
   "src/app/admin/ai/ai-knowledge-tab.tsx",
 );
+const { WebhookList } = loadUiModule(
+  "src/app/admin/webhooks/webhook-list.tsx",
+);
+const { WebhookFormDialog } = loadUiModule(
+  "src/app/admin/webhooks/webhook-form-dialog.tsx",
+);
 
 const noop = () => {};
 
@@ -249,6 +255,49 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(rating, /widget\.closedByAgent/);
   assert.match(rating, /widget\.rateHint/);
   assert.match(rating, /widget\.startNew/);
+});
+
+test("webhook list and form render channel controls", () => {
+  const endpoint = {
+    id: "webhook-1",
+    name: "Ops webhook",
+    type: "GENERIC",
+    url: "https://hooks.example.test/endpoint",
+    secret: "secret",
+    events: ["message.created"],
+    siteId: null,
+    siteName: null,
+    active: true,
+    lastStatus: "success",
+    lastTriggeredAt: null,
+  };
+  const list = renderUi(WebhookList, {
+    endpoints: [endpoint],
+    testingId: null,
+    onNew: noop,
+    onEdit: noop,
+    onTest: noop,
+    onDelete: noop,
+    onToggle: noop,
+  });
+  assert.match(list, /Ops webhook/);
+  assert.match(list, /webhooks\.typeGeneric/);
+  assert.match(list, /webhooks\.eventMessageCreated/);
+  assert.match(list, /webhooks\.test/);
+
+  const form = renderUi(WebhookFormDialog, {
+    platform: false,
+    open: true,
+    onOpenChange: noop,
+    endpoint: null,
+    sites: [{ id: "site-1", name: "Demo Site" }],
+    onSaved: noop,
+  });
+  assert.match(form, /id="webhook-name"/);
+  assert.match(form, /id="webhook-url"/);
+  assert.match(form, /webhooks\.eventsLabel/);
+  assert.match(form, /webhooks\.siteScope/);
+  assert.match(form, /common\.save/);
 });
 
 test("visitor panel sections render profile, history and edit controls", () => {

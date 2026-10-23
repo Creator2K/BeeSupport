@@ -92,6 +92,7 @@ const DialogContent = element("div");
 const DialogHeader = element("div");
 const DialogTitle = element("h2");
 const DialogDescription = element("p");
+const DialogFooter = element("div");
 const AlertDialog = element("div");
 const AlertDialogContent = element("div");
 const AlertDialogHeader = element("div");
@@ -101,9 +102,25 @@ const AlertDialogFooter = element("div");
 const AlertDialogCancel = element("button");
 const AlertDialogAction = element("button");
 const Separator = element("hr");
+const Checkbox = ({ checked, ...props }) =>
+  React.createElement("button", {
+    ...domProps("button", props),
+    role: "checkbox",
+    "aria-checked": Boolean(checked),
+  });
+const Table = element("table");
+const TableHeader = element("thead");
+const TableBody = element("tbody");
+const TableRow = element("tr");
+const TableHead = element("th");
+const TableCell = element("td");
 
 const useT = () => (key, values) =>
   values ? `${key}:${JSON.stringify(values)}` : key;
+
+const webhookTypes = loadModule(
+  "src/app/admin/webhooks/webhook-types.ts",
+);
 
 const visitorPanelShared = loadModule(
   "src/components/agent/visitor-panel-shared.tsx",
@@ -163,6 +180,15 @@ export const uiDependencies = {
   "@/components/ui/badge": { Badge },
   "@/components/ui/switch": { Switch },
   "@/components/ui/separator": { Separator },
+  "@/components/ui/checkbox": { Checkbox },
+  "@/components/ui/table": {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+  },
   "@/components/ui/card": {
     Card,
     CardHeader,
@@ -194,6 +220,7 @@ export const uiDependencies = {
     DialogHeader,
     DialogTitle,
     DialogDescription,
+    DialogFooter,
   },
   "@/components/ui/alert-dialog": {
     AlertDialog,
@@ -213,11 +240,22 @@ export const uiDependencies = {
         .join(" "),
   },
   "@/lib/launcher": { launcherForeground: () => "#ffffff" },
+  "@/lib/client-action": {
+    callClientAction: async () => ({ ok: true, message: "ok" }),
+  },
+  "@/server/actions/webhooks": {
+    createWebhookAction: async () => ({ ok: true }),
+    updateWebhookAction: async () => ({ ok: true }),
+    deleteWebhookAction: async () => ({ ok: true }),
+    testWebhookAction: async () => ({ ok: true }),
+    toggleWebhookAction: async () => ({ ok: true }),
+  },
   "@/lib/format": {
     formatRelative: () => "2 minutes ago",
     formatDateTime: () => "2026-10-23 09:00",
   },
   "./visitor-panel-shared": visitorPanelShared,
+  "./webhook-types": webhookTypes,
   "@/lib/visitor-env": {
     describeVisitor: () => ({
       device: "Desktop",
