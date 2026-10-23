@@ -179,6 +179,16 @@ const { MerchantCard } = loadUiModule(
 const { MerchantDialog } = loadUiModule(
   "src/app/admin/merchants/merchant-dialog.tsx",
 );
+const { HomeHeader } = loadUiModule(
+  "src/components/home/home-header.tsx",
+);
+const { HomeHero } = loadUiModule("src/components/home/home-hero.tsx");
+const { HomeFeatures } = loadUiModule(
+  "src/components/home/home-features.tsx",
+);
+const { HomeSteps } = loadUiModule("src/components/home/home-steps.tsx");
+const { HomeFaq } = loadUiModule("src/components/home/home-faq.tsx");
+const { HomePlans } = loadUiModule("src/components/home/home-plans.tsx");
 
 const noop = () => {};
 
@@ -541,6 +551,73 @@ test("subscription catalog split components render plans and order confirmation"
   assert.match(dialog, /merchant-order-note/);
   assert.match(dialog, /\u957f\u671f\u6709\u6548/);
   assert.match(dialog, /\u63d0\u4ea4\u8ba2\u5355/);
+});
+
+test("home view split components render navigation, hero and content sections", () => {
+  const content = {
+    brandName: "Demo Brand",
+    description: "Demo description",
+    heroEyebrow: "Demo eyebrow",
+    titleLine1: "Title one",
+    titleLine2: "Title two",
+    titleHighlight: "Highlight",
+    heroDescription: "Hero description",
+    primaryCta: "Start now",
+    closingTitle: "Closing title",
+    footerText: "Footer text",
+    sections: {
+      features: true,
+      appearance: true,
+      steps: true,
+      faq: true,
+      plans: true,
+    },
+    features: [
+      { title: "Feature one", text: "Feature text", tag: "Feature tag" },
+    ],
+    faqs: [{ question: "Question one", answer: "Answer one" }],
+    planIds: ["plan-1"],
+  };
+  const header = renderUi(HomeHeader, { content });
+  assert.match(header, /Demo Brand/);
+  assert.match(header, /\u4ea7\u54c1\u80fd\u529b/);
+  assert.match(header, /申请入驻/);
+
+  const hero = renderUi(HomeHero, {
+    content,
+    secondaryAnchor: "#appearance",
+  });
+  assert.match(hero, /Highlight/);
+  assert.match(hero, /Start now/);
+  assert.match(hero, /product-scene:Demo Brand/);
+
+  const features = renderUi(HomeFeatures, { content });
+  assert.match(features, /Feature one/);
+  assert.match(features, /Feature tag/);
+
+  const steps = renderUi(HomeSteps, { enabled: true });
+  assert.match(steps, /创建商家空间/);
+
+  const faq = renderUi(HomeFaq, { faqs: content.faqs });
+  assert.match(faq, /Question one/);
+
+  const plans = renderUi(HomePlans, {
+    plans: [
+      {
+        id: "plan-1",
+        name: "Pro Plan",
+        description: "For growing teams",
+        priceCents: 9900,
+        durationDays: 30,
+        maxAgents: 10,
+        maxSites: 3,
+        monthlyConversations: 5000,
+        storageMB: 2048,
+      },
+    ],
+  });
+  assert.match(plans, /Pro Plan/);
+  assert.match(plans, /99\.00/);
 });
 
 test("merchant split components render usage cards and management form", () => {

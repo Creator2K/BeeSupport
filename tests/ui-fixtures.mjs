@@ -12,6 +12,11 @@ const icon = (props) =>
     "aria-hidden": "true",
     title: props?.title,
   });
+const cssModule = new Proxy(
+  {},
+  { get: (_target, key) => String(key) },
+);
+
 const icons = new Proxy(
   {},
   {
@@ -298,6 +303,19 @@ export const uiDependencies = {
         description: "Balanced launcher",
       },
     ],
+  },
+  "@/components/home/home.module.css": cssModule,
+  "./home.module.css": cssModule,
+  "@/components/home/product-scene": {
+    ProductScene: ({ brandName }) =>
+      React.createElement("div", null, `product-scene:${brandName}`),
+  },
+  "./product-scene": {
+    ProductScene: ({ brandName }) =>
+      React.createElement("div", null, `product-scene:${brandName}`),
+  },
+  "@/components/home/appearance-demo": {
+    AppearanceDemo: () => React.createElement("div", null, "appearance-demo"),
   },
   "@/components/widget/launcher-preview": {
     LauncherPreview: ({ style, label }) =>
