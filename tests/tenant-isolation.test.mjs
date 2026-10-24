@@ -105,16 +105,25 @@ const prisma = {
   },
 };
 
-const { tenantDb } = loadModule("src/lib/tenant-db.ts", {
-  "./auth": { ...auth, requireAdmin: async () => merchant },
-  "./db": { prisma },
-});
 const merchant = {
   id: "merchant-own",
   role: "MERCHANT_ADMIN",
   tenantId: ownTenant,
   siteIds: ["site-own", "site-own-2"],
 };
+const authDeps = {
+  ...auth,
+  requireAdmin: async () => merchant,
+};
+const relations = loadModule("src/lib/tenant-relations.ts", {
+  "./auth": authDeps,
+  "./db": { prisma },
+});
+const { tenantDb } = loadModule("src/lib/tenant-db.ts", {
+  "./auth": authDeps,
+  "./db": { prisma },
+  "./tenant-relations": relations,
+});
 const db = tenantDb(merchant);
 const run = (model, operation, data) =>
   db.$allOperations({
