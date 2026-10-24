@@ -457,6 +457,18 @@ export const uiDependencies = {
   },
 };
 
+uiDependencies["./ai-connection-config-card"] = loadModule(
+  "src/app/admin/ai/ai-connection-config-card.tsx",
+  uiDependencies,
+);
+uiDependencies["./ai-capability-card"] = loadModule(
+  "src/app/admin/ai/ai-capability-card.tsx",
+  uiDependencies,
+);
+uiDependencies["./ai-test-card"] = loadModule(
+  "src/app/admin/ai/ai-test-card.tsx",
+  uiDependencies,
+);
 uiDependencies["./risk-pagination"] = loadModule(
   "src/app/admin/risk/risk-pagination.tsx",
   uiDependencies,
