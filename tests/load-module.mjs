@@ -119,14 +119,28 @@ export function loadConversationService(dependencies = {}) {
     },
   );
   const actions = { ...actionDetail, ...actionTransitions, ...actionDetails };
-  const visitor = loadModule(
-    "src/server/services/conversation-visitor.ts",
+  const visitorCreate = loadModule(
+    "src/server/services/conversation-visitor-create.ts",
     {
       ...dependencies,
       "./conversation-queries": queries,
     },
   );
-  return { ...queries, ...actions, ...visitor };
+  const visitorState = loadModule(
+    "src/server/services/conversation-visitor-state.ts",
+    dependencies,
+  );
+  const visitorActions = loadModule(
+    "src/server/services/conversation-visitor-actions.ts",
+    dependencies,
+  );
+  return {
+    ...queries,
+    ...actions,
+    ...visitorCreate,
+    ...visitorState,
+    ...visitorActions,
+  };
 }
 
 /** Assemble the split message service with explicit test doubles. */
