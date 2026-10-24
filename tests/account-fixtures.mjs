@@ -9,7 +9,7 @@ export const accountValidation = loadModule("src/lib/validation.ts", {
 export const accountSecret = "isolated-account-mail-test-secret";
 
 export function accountService(prisma, options = {}) {
-  return loadModule("src/server/services/account-access.ts", {
+  const dependencies = {
     zod: { z },
     "../../lib/auth": {
       HttpError,
@@ -36,7 +36,21 @@ export function accountService(prisma, options = {}) {
           throw Error("Unexpected quota operation");
         }),
     },
-  });
+  };
+  const credentials = loadModule(
+    "src/server/services/account-credentials.ts",
+    dependencies,
+  );
+  const tokens = loadModule("src/server/services/account-tokens.ts", dependencies);
+  const invitations = loadModule(
+    "src/server/services/account-invitations.ts",
+    {
+      ...dependencies,
+      "./account-credentials": credentials,
+      "./account-tokens": tokens,
+    },
+  );
+  return { ...credentials, ...tokens, ...invitations };
 }
 
 export function accountMail(prisma, sendMail) {
