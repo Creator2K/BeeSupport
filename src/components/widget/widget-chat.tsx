@@ -1,53 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Loader2, MessageSquare } from "lucide-react";
 
+import { useT } from "@/components/locale-provider";
+import { Button } from "@/components/ui/button";
+import { useWidgetMessaging } from "@/components/widget/use-widget-messaging";
+import { useWidgetRealtime } from "@/components/widget/use-widget-realtime";
+import {
+  useWidgetSessionActions,
+  useWidgetSessionState,
+} from "@/components/widget/use-widget-session";
+import { useWidgetTracking } from "@/components/widget/use-widget-tracking";
+import { fetchWidgetState } from "@/components/widget/widget-session-api";
 import { WidgetComposer } from "@/components/widget/widget-composer";
 import { WidgetHeader } from "@/components/widget/widget-header";
 import { WidgetIdentityForm } from "@/components/widget/widget-identity-form";
 import { WidgetMessageList } from "@/components/widget/widget-message-list";
-import { useWidgetMessaging } from "@/components/widget/use-widget-messaging";
-import { useWidgetTracking } from "@/components/widget/use-widget-tracking";
-import { useWidgetRealtime } from "@/components/widget/use-widget-realtime";
-import type {
-  Availability,
-  SiteConfig,
-} from "@/components/widget/widget-types";
-import { useT } from "@/components/locale-provider";
-import { Button } from "@/components/ui/button";
-import type { SerializedMessage } from "@/lib/realtime/types";
-import type { VisitorConversation } from "@/lib/realtime/public";
-import { mergeMessages } from "@/lib/realtime/messages";
-import { useSocket } from "@/lib/realtime/use-socket";
 import { useChatScroll } from "@/lib/realtime/use-chat-scroll";
-
-async function fetchState(
-  visitorToken: string,
-  conversationId?: string | null,
-  before?: string,
-): Promise<{
-  conversation: VisitorConversation | null;
-  messages: SerializedMessage[];
-} | null> {
-  try {
-    const params = new URLSearchParams();
-    if (conversationId) params.set("conversationId", conversationId);
-    if (before) params.set("before", before);
-    const response = await fetch(`/api/widget/conversation?${params}`, {
-      headers: { authorization: `Bearer ${visitorToken}` },
-      cache: "no-store",
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as {
-      conversation: VisitorConversation | null;
-      messages: SerializedMessage[];
-    };
-  } catch {
-    return null;
-  }
-}
-
+import { useSocket } from "@/lib/realtime/use-socket";
 export function WidgetChat({
   siteKey,
   embedToken,
@@ -64,39 +35,45 @@ export function WidgetChat({
   host: string;
 }) {
   const t = useT();
-  const [mode, setMode] = useState<"loading" | "error" | "form" | "chat">(
-    "loading",
-  );
-  const [config, setConfig] = useState<SiteConfig | null>(null);
-  const [availability, setAvailability] = useState<Availability>({
-    online: false,
-    agentsOnline: 0,
-    withinWorkHours: true,
-  });
-
-  const [token, setToken] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const [conversation, setConversation] = useState<VisitorConversation | null>(
-    null,
-  );
-  const [messages, setMessages] = useState<SerializedMessage[]>([]);
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+  const {
+    mode,
+    setMode,
+    config,
+    setConfig,
+    availability,
+    setAvailability,
+    token,
+    setToken,
+    email,
+    setEmail,
+    name,
+    setName,
+    formError,
+    setFormError,
+    submitting,
+    setSubmitting,
+    conversation,
+    setConversation,
+    messages,
+    setMessages,
+    messagesRef,
+    unread,
+    setUnread,
+    hasOlder,
+    setHasOlder,
+    loadingOlder,
+    setLoadingOlder,
+    ratingValue,
+    setRatingValue,
+    ratingComment,
+    setRatingComment,
+    ratingSubmitted,
+    setRatingSubmitted,
+    conversationIdRef,
+  } = useWidgetSessionState();
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
-
   const [agentTyping, setAgentTyping] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [hasOlder, setHasOlder] = useState(false);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-
-  const [ratingValue, setRatingValue] = useState(0);
-  const [ratingComment, setRatingComment] = useState("");
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
   const {
     scrollRef,
@@ -110,8 +87,6 @@ export function WidgetChat({
     lastMessageId: messages.at(-1)?.id,
     activity: `${mode}:${agentTyping}`,
   });
-  const conversationIdRef = useRef<string | null>(null);
-  conversationIdRef.current = conversation?.id ?? null;
 
   const { socket, connected } = useSocket({
     auth: { token },
@@ -173,7 +148,7 @@ export function WidgetChat({
     conversationIdRef,
     messagesRef,
     reportTrackRef,
-    fetchState,
+    fetchState: fetchWidgetState,
     markRead,
     setConversation,
     setMessages,
@@ -185,181 +160,51 @@ export function WidgetChat({
     setRatingSubmitted,
   });
 
-  // 初始化：站点配置 + 本地身份恢复
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      if (!siteKey) {
-        setMode("error");
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `/api/widget/config?key=${encodeURIComponent(siteKey)}`,
-          { cache: "no-store", headers: { "x-beesupport-embed": embedToken } },
-        );
-        if (!response.ok) {
-          if (!cancelled) setMode("error");
-          return;
-        }
-
-        const data = (await response.json()) as {
-          site: SiteConfig;
-          availability: Availability;
-        };
-        if (cancelled) return;
-
-        setConfig(data.site);
-        setAvailability(data.availability);
-        ensureLocalKey();
-        void reportTrackRef.current();
-        postToParent({ type: "beesupport:ready", site: data.site });
-
-        const stored = readIdentity();
-        if (stored?.token) {
-          const state = await fetchState(stored.token);
-          if (cancelled) return;
-          if (state) {
-            setToken(stored.token);
-            setEmail(stored.email ?? "");
-            setName(stored.name ?? "");
-            setConversation(state.conversation);
-            setMessages(state.messages);
-            setHasOlder(state.messages.length === 200);
-            setUnread(state.conversation?.unreadForVisitor ?? 0);
-            if (state.conversation?.rating) {
-              setRatingSubmitted(true);
-            }
-            setMode("chat");
-            return;
-          }
-          window.localStorage.removeItem(identityStorageKey);
-        }
-
-        if (stored?.email) setEmail(stored.email);
-        if (stored?.name) setName(stored.name);
-        setMode("form");
-      } catch {
-        if (!cancelled) setMode("error");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  const {
+    startSession,
+    loadOlder,
+    submitRating,
+    startNewConversation,
+  } = useWidgetSessionActions({
     siteKey,
-    identityStorageKey,
+    embedToken,
+    pageUrl,
+    referrer,
+    page,
+    collectEnv,
+    ensureLocalKey,
     readIdentity,
     postToParent,
-    embedToken,
-    ensureLocalKey,
     reportTrackRef,
-  ]);
+    identityStorageKey,
+    token,
+    conversation,
+    messages,
+    loadingOlder,
+    email,
+    name,
+    ratingValue,
+    ratingComment,
+    conversationIdRef,
+    preserveHistoryPosition,
+    setMode,
+    setConfig,
+    setAvailability,
+    setToken,
+    setEmail,
+    setName,
+    setFormError,
+    setSubmitting,
+    setConversation,
+    setMessages,
+    setHasOlder,
+    setLoadingOlder,
+    setUnread,
+    setRatingValue,
+    setRatingComment,
+    setRatingSubmitted,
+  });
 
-
-  async function loadOlder() {
-    if (!token || !conversation || !messages[0] || loadingOlder) return;
-    setLoadingOlder(true);
-    const id = conversation.id;
-    try {
-      const state = await fetchState(token, id, messages[0].id);
-      if (!state || id !== conversationIdRef.current) return;
-      preserveHistoryPosition();
-      setMessages((previous) => mergeMessages(previous, state.messages));
-      setHasOlder(state.messages.length === 200);
-    } finally {
-      setLoadingOlder(false);
-    }
-  }
-
-  async function startSession(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-
-    try {
-      const response = await fetch("/api/widget/session", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-beesupport-embed": embedToken,
-        },
-        body: JSON.stringify({
-          key: siteKey,
-          localKey: ensureLocalKey(),
-          email: email.trim() || undefined,
-          name: name.trim() || undefined,
-          env: collectEnv(),
-          pageUrl: page.url || pageUrl || undefined,
-          pageTitle: page.title || undefined,
-          referrer: referrer || undefined,
-        }),
-      });
-
-      const data = (await response.json()) as {
-        token?: string;
-        visitor?: { email: string; name: string | null };
-        availability?: Availability;
-        conversation?: VisitorConversation | null;
-        messages?: SerializedMessage[];
-        error?: string;
-      };
-
-      if (!response.ok || !data.token) {
-        setFormError(data.error ?? t("common.operationFailed"));
-        return;
-      }
-
-      window.localStorage.setItem(
-        identityStorageKey,
-        JSON.stringify({
-          token: data.token,
-          email: data.visitor?.email ?? email,
-          name: data.visitor?.name ?? name,
-        }),
-      );
-
-      setToken(data.token);
-      if (data.availability) setAvailability(data.availability);
-      setConversation(data.conversation ?? null);
-      setMessages(data.messages ?? []);
-      setHasOlder((data.messages?.length ?? 0) === 200);
-      setMode("chat");
-    } catch {
-      setFormError(t("common.operationFailed"));
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function submitRating() {
-    if (!token || !conversation || ratingValue === 0) return;
-    const response = await fetch("/api/widget/rate", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        conversationId: conversation.id,
-        rating: ratingValue,
-        comment: ratingComment || undefined,
-      }),
-    });
-    if (response.ok) setRatingSubmitted(true);
-  }
-
-  function startNewConversation() {
-    setConversation(null);
-    setMessages([]);
-    setHasOlder(false);
-    setRatingValue(0);
-    setRatingComment("");
-    setRatingSubmitted(false);
-  }
 
   const showOfflineNotice = !availability.online && !conversation;
   return (
