@@ -477,6 +477,18 @@ uiDependencies["./ai-knowledge-editor"] = loadModule(
   "src/app/admin/ai/ai-knowledge-editor.tsx",
   uiDependencies,
 );
+uiDependencies["./admin-nav-brand"] = loadModule(
+  "src/components/admin/admin-nav-brand.tsx",
+  uiDependencies,
+);
+uiDependencies["./admin-nav-groups"] = loadModule(
+  "src/components/admin/admin-nav-groups.tsx",
+  uiDependencies,
+);
+uiDependencies["./admin-nav-user-menu"] = loadModule(
+  "src/components/admin/admin-nav-user-menu.tsx",
+  uiDependencies,
+);
 uiDependencies["./risk-pagination"] = loadModule(
   "src/app/admin/risk/risk-pagination.tsx",
   uiDependencies,
