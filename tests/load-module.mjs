@@ -72,12 +72,19 @@ export function loadAiModule(prisma = {}) {
   const provider = loadModule("src/lib/ai-provider.ts", {
     "./ai-config": config,
   });
-  const knowledge = loadModule("src/lib/ai-knowledge.ts", {
+  const text = loadModule("src/lib/ai-text.ts");
+  const retrieval = loadModule("src/lib/ai-retrieval.ts", {
     "./db": db,
     "./ai-config": config,
     "./ai-provider": provider,
+    "./ai-text": text,
   });
-  return { ...config, ...provider, ...knowledge };
+  const prompt = loadModule("src/lib/ai-prompt.ts", {
+    "./ai-config": config,
+    "./ai-provider": provider,
+    "./ai-retrieval": retrieval,
+  });
+  return { ...config, ...provider, ...text, ...retrieval, ...prompt };
 }
 
 /** Assemble the split conversation service with explicit test doubles. */
