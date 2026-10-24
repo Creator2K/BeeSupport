@@ -131,7 +131,31 @@ export function loadConversationService(dependencies = {}) {
 
 /** Assemble the split message service with explicit test doubles. */
 export function loadMessageService(dependencies = {}) {
-  const write = loadModule("src/server/services/message-write.ts", dependencies);
+  const types = loadModule(
+    "src/server/services/message-write-types.ts",
+    dependencies,
+  );
+  const helpers = loadModule(
+    "src/server/services/message-write-helpers.ts",
+    {
+      ...dependencies,
+      "./message-write-types": types,
+    },
+  );
+  const core = loadModule("src/server/services/message-write-core.ts", {
+    ...dependencies,
+    "./message-write-types": types,
+    "./message-write-helpers": helpers,
+  });
+  const dispatch = loadModule(
+    "src/server/services/message-write-dispatch.ts",
+    {
+      ...dependencies,
+      "./message-write-types": types,
+      "./message-write-core": core,
+    },
+  );
+  const write = { ...types, ...core, ...dispatch };
   const posting = loadModule("src/server/services/message-posting.ts", {
     ...dependencies,
     "./message-write": write,
