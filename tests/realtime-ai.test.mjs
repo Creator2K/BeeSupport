@@ -4,6 +4,7 @@ import {
   loadAiModule,
   loadAiService,
   loadModule,
+  loadSocketModule,
   auth,
   nextTurn,
 } from "./load-module.mjs";
@@ -233,7 +234,7 @@ async function socketFixture({ anonymous = false } = {}) {
   const previousConversationTtl = process.env.SOCKET_CONVERSATION_TTL_MS;
   process.env.SOCKET_IDENTITY_TTL_MS = "50";
   process.env.SOCKET_CONVERSATION_TTL_MS = "50";
-  const module = loadModule("src/server/socket.ts", {
+  const module = loadSocketModule({
     "../lib/auth": {
       ...auth,
       SESSION_COOKIE: "session",

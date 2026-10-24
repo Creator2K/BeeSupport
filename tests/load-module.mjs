@@ -153,3 +153,28 @@ export function loadWebhookModule(dependencies = {}) {
   });
   return { ...types, ...request, ...delivery, ...test };
 }
+
+/** Assemble the split realtime socket entry with explicit test doubles. */
+export function loadSocketModule(dependencies = {}) {
+  const auth = loadModule("src/server/socket-auth.ts", dependencies);
+  const session = loadModule("src/server/socket-session.ts", {
+    ...dependencies,
+    "./socket-auth": auth,
+  });
+  const lifecycle = loadModule("src/server/socket-lifecycle.ts", {
+    ...dependencies,
+    "./socket-auth": auth,
+  });
+  const events = loadModule("src/server/socket-events.ts", {
+    ...dependencies,
+    "./socket-auth": auth,
+    "./socket-session": session,
+  });
+  return loadModule("src/server/socket.ts", {
+    ...dependencies,
+    "./socket-auth": auth,
+    "./socket-session": session,
+    "./socket-lifecycle": lifecycle,
+    "./socket-events": events,
+  });
+}
