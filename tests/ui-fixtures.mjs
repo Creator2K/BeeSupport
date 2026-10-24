@@ -469,6 +469,14 @@ uiDependencies["./ai-test-card"] = loadModule(
   "src/app/admin/ai/ai-test-card.tsx",
   uiDependencies,
 );
+uiDependencies["./ai-knowledge-list"] = loadModule(
+  "src/app/admin/ai/ai-knowledge-list.tsx",
+  uiDependencies,
+);
+uiDependencies["./ai-knowledge-editor"] = loadModule(
+  "src/app/admin/ai/ai-knowledge-editor.tsx",
+  uiDependencies,
+);
 uiDependencies["./risk-pagination"] = loadModule(
   "src/app/admin/risk/risk-pagination.tsx",
   uiDependencies,
