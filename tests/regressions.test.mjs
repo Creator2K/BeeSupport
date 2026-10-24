@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   auth,
   loadAiModule,
+  loadConversationService,
   loadModule,
   nextTurn,
   tenants,
@@ -575,7 +576,7 @@ test("the original agent can claim a conversation reopened by its visitor", asyn
     message: { create: async () => ({ id: "system" }) },
   };
   prisma.$transaction = async (callback) => callback(prisma);
-  const service = loadModule("src/server/services/conversations.ts", {
+  const service = loadConversationService({
     "./tenants": tenants,
     "../../lib/auth": auth,
     "../../lib/db": { prisma },

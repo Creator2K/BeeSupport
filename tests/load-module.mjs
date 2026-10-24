@@ -79,3 +79,23 @@ export function loadAiModule(prisma = {}) {
   });
   return { ...config, ...provider, ...knowledge };
 }
+
+/** Assemble the split conversation service with explicit test doubles. */
+export function loadConversationService(dependencies = {}) {
+  const queries = loadModule(
+    "src/server/services/conversation-queries.ts",
+    dependencies,
+  );
+  const actions = loadModule(
+    "src/server/services/conversation-actions.ts",
+    dependencies,
+  );
+  const visitor = loadModule(
+    "src/server/services/conversation-visitor.ts",
+    {
+      ...dependencies,
+      "./conversation-queries": queries,
+    },
+  );
+  return { ...queries, ...actions, ...visitor };
+}

@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { loadModule, auth, tenants } from "../load-module.mjs";
+import {
+  auth,
+  loadConversationService,
+  loadModule,
+  tenants,
+} from "../load-module.mjs";
 import { useTestDatabase } from "../../scripts/test-environment.mjs";
 
 useTestDatabase();
@@ -60,7 +65,7 @@ test("transactional outbox rolls back with a claim, retries independently, and r
     "./notification-outbox": prefs,
   });
   const buildService = (notify = notifications) =>
-    loadModule("src/server/services/conversations.ts", {
+    loadConversationService({
       "./tenants": tenants,
       "../../lib/auth": auth,
       "../../lib/db": { prisma },

@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadModule, auth, nextTurn, tenants } from "./load-module.mjs";
+import {
+  auth,
+  loadConversationService,
+  loadModule,
+  nextTurn,
+  tenants,
+} from "./load-module.mjs";
 
 const serializer = loadModule("src/server/serialize.ts");
 const locks = loadModule("src/server/transactions.ts");
@@ -87,7 +93,7 @@ function fixture() {
       return work;
     },
   };
-  const service = loadModule("src/server/services/conversations.ts", {
+  const service = loadConversationService({
     "./tenants": tenants,
     "../../lib/auth": auth,
     "../../lib/db": { prisma },
