@@ -5,21 +5,14 @@ import { HttpError, type SessionUser } from "../../lib/auth";
 import { prisma } from "../../lib/db";
 import { rateLimit } from "../../lib/rate-limit";
 import {
-  AUDIT_ACTION_LABELS,
-  MAX_EXPORT_ROWS,
-  conversationStatuses,
   exportInputSchema,
   makeCsv,
-  reportOrderStatuses,
-  reportTime,
   type ExportInput,
 } from "../../lib/reporting";
-import {
-  assertManager,
-  auditSelect,
-  auditWhere,
-  range,
-} from "./reporting-access";
+import { assertManager, range } from "./reporting-access";
+import { collectAuditExport } from "./data-export-audit";
+import { collectConversationExport } from "./data-export-conversations";
+import { collectOrderExport } from "./data-export-orders";
 
 export async function generateDataExport(
   actor: SessionUser,
@@ -35,222 +28,12 @@ export async function generateDataExport(
   const exportId = randomUUID();
   return prisma.$transaction(
     async (tx) => {
-      let headers: string[], rows: unknown[][];
-      const bound = (count: number) => {
-        if (count > MAX_EXPORT_ROWS)
-          throw new HttpError(
-            413,
-            `结果超过 ${MAX_EXPORT_ROWS} 条，请缩小日期范围或增加筛选条件`,
-          );
-      };
-      if (data.kind === "conversations") {
-        if (
-          data.siteId &&
-          !(await tx.site.findFirst({
-            where: {
-              id: data.siteId,
-              ...(actor.role === "ADMIN" ? {} : { tenantId: actor.tenantId }),
-            },
-            select: { id: true },
-          }))
-        )
-          throw new HttpError(403, "无权导出该站点的数据");
-        const where: Prisma.ConversationWhereInput = {
-          createdAt: dates,
-          ...(actor.role === "ADMIN"
-            ? {}
-            : { site: { tenantId: actor.tenantId } }),
-          ...(data.siteId ? { siteId: data.siteId } : {}),
-          ...(data.status ? { status: data.status } : {}),
-          ...(data.query
-            ? {
-                OR: [
-                  {
-                    visitor: {
-                      email: { contains: data.query, mode: "insensitive" },
-                    },
-                  },
-                  {
-                    visitor: {
-                      name: { contains: data.query, mode: "insensitive" },
-                    },
-                  },
-                  { subject: { contains: data.query, mode: "insensitive" } },
-                  { id: { contains: data.query } },
-                ],
-              }
-            : {}),
-        };
-        bound(await tx.conversation.count({ where }));
-        const records = await tx.conversation.findMany({
-          where,
-          take: MAX_EXPORT_ROWS,
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: {
-            id: true,
-            status: true,
-            source: true,
-            subject: true,
-            createdAt: true,
-            lastMessageAt: true,
-            closedAt: true,
-            rating: true,
-            site: { select: { name: true } },
-            visitor: { select: { email: true, name: true } },
-            assignedAgent: { select: { name: true } },
-          },
-        });
-        headers = [
-          "会话编号",
-          "站点",
-          "访客邮箱",
-          "访客姓名",
-          "状态",
-          "来源",
-          "主题",
-          "接待人员",
-          "创建时间（北京时间）",
-          "最近消息时间（北京时间）",
-          "结束时间（北京时间）",
-          "评分",
-        ];
-        rows = records.map((row) => [
-          row.id,
-          row.site.name,
-          row.visitor.email,
-          row.visitor.name,
-          conversationStatuses[row.status],
-          row.source === "OFFLINE_FORM" ? "离线留言" : "聊天窗口",
-          row.subject,
-          row.assignedAgent?.name,
-          reportTime(row.createdAt),
-          reportTime(row.lastMessageAt),
-          reportTime(row.closedAt),
-          row.rating,
-        ]);
-      } else if (data.kind === "orders") {
-        const status: Prisma.SubscriptionOrderWhereInput =
-          data.status === "EXPIRED"
-            ? {
-                OR: [
-                  { status: "EXPIRED" },
-                  { status: "PENDING", validUntil: { lte: now } },
-                ],
-              }
-            : data.status === "PENDING"
-              ? { status: "PENDING", validUntil: { gt: now } }
-              : data.status
-                ? { status: data.status }
-                : {};
-        const where: Prisma.SubscriptionOrderWhereInput = {
-          AND: [
-            { createdAt: dates },
-            actor.role === "ADMIN" ? {} : { tenantId: actor.tenantId },
-            status,
-            data.query
-              ? {
-                  OR: [
-                    { orderNo: { contains: data.query, mode: "insensitive" } },
-                    { planName: { contains: data.query, mode: "insensitive" } },
-                    {
-                      tenant: {
-                        name: { contains: data.query, mode: "insensitive" },
-                      },
-                    },
-                  ],
-                }
-              : {},
-          ],
-        };
-        bound(await tx.subscriptionOrder.count({ where }));
-        const records = await tx.subscriptionOrder.findMany({
-          where,
-          take: MAX_EXPORT_ROWS,
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: {
-            orderNo: true,
-            tenant: { select: { name: true } },
-            status: true,
-            validUntil: true,
-            planName: true,
-            priceCents: true,
-            durationDays: true,
-            maxAgents: true,
-            maxSites: true,
-            monthlyConversations: true,
-            storageMB: true,
-            createdAt: true,
-            reviewedAt: true,
-            periodStart: true,
-            periodEnd: true,
-          },
-        });
-        headers = [
-          "订单号",
-          "商家",
-          "状态",
-          "套餐快照名称",
-          "金额（元）",
-          "有效天数",
-          "账号上限",
-          "站点上限",
-          "月会话上限",
-          "存储上限（MB）",
-          "创建时间（北京时间）",
-          "审核时间（北京时间）",
-          "服务开始（北京时间）",
-          "服务结束（北京时间）",
-        ];
-        rows = records.map((row) => [
-          row.orderNo,
-          row.tenant.name,
-          reportOrderStatuses[
-            row.status === "PENDING" && row.validUntil <= now
-              ? "EXPIRED"
-              : row.status
-          ] ?? row.status,
-          row.planName,
-          (row.priceCents / 100).toFixed(2),
-          row.durationDays,
-          row.maxAgents,
-          row.maxSites,
-          row.monthlyConversations,
-          row.storageMB,
-          reportTime(row.createdAt),
-          reportTime(row.reviewedAt),
-          reportTime(row.periodStart),
-          reportTime(row.periodEnd),
-        ]);
-      } else {
-        const where = auditWhere(actor, data, now);
-        bound(await tx.auditLog.count({ where }));
-        const records = await tx.auditLog.findMany({
-          where,
-          select: auditSelect,
-          take: MAX_EXPORT_ROWS,
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        });
-        headers = [
-          "记录编号",
-          "时间（北京时间）",
-          "操作人员",
-          "操作",
-          "操作代码",
-          "对象类型",
-          "对象编号",
-          "IP",
-        ];
-        rows = records.map((row) => [
-          row.id,
-          reportTime(row.createdAt),
-          row.actorName,
-          AUDIT_ACTION_LABELS[row.action] ?? row.action,
-          row.action,
-          row.targetType,
-          row.targetId,
-          row.ip,
-        ]);
-      }
+      const { headers, rows } =
+        data.kind === "conversations"
+          ? await collectConversationExport(tx, actor, data, dates)
+          : data.kind === "orders"
+            ? await collectOrderExport(tx, actor, data, dates, now)
+            : await collectAuditExport(tx, actor, data, now);
       const csv = makeCsv(headers, rows);
       await tx.auditLog.create({
         data: {
