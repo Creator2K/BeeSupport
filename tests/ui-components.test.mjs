@@ -36,6 +36,9 @@ const { WidgetComposer } = loadUiModule(
 const { WidgetClosedCard } = loadUiModule(
   "src/components/widget/widget-closed-card.tsx",
 );
+const { WidgetMessageList } = loadUiModule(
+  "src/components/widget/widget-message-list.tsx",
+);
 const { VisitorProfileSection } = loadUiModule(
   "src/components/agent/visitor-profile-section.tsx",
 );
@@ -198,7 +201,7 @@ const { HomeFaq } = loadUiModule("src/components/home/home-faq.tsx");
 const { HomePlans } = loadUiModule("src/components/home/home-plans.tsx");
 
 const { extractClipboardFiles } = loadModule(
-  "src/app/agent/workbench-messaging-utils.ts",
+  "src/lib/clipboard-files.ts",
 );
 
 const noop = () => {};
@@ -323,6 +326,7 @@ test("agent workbench split components keep key actions and states", () => {
   });
   assert.match(composer, /workbench\.sendPlaceholder/);
   assert.match(composer, /common\.newMessages/);
+
   assert.match(composer, /ai-suggestion:Suggested reply/);
   assert.match(composer, /canned-picker/);
   const conversationHeader = renderUi(ConversationHeader, {
@@ -472,6 +476,52 @@ test("widget split components render identity, composer and rating controls", ()
   assert.match(composer, /widget\.send/);
   assert.match(composer, /images\.enabled/);
   assert.match(composer, /common\.newMessages/);
+
+  const list = renderUi(WidgetMessageList, {
+    config,
+    conversation: {
+      id: "conversation-1",
+      status: "CLOSED",
+      rating: null,
+      unreadForVisitor: 0,
+    },
+    messages: [
+      {
+        id: "message-1",
+        conversationId: "conversation-1",
+        sender: "AGENT",
+        type: "TEXT",
+        body: "Hello visitor",
+        authorId: "agent-1",
+        authorName: "Agent",
+        createdAt: "2026-10-24T09:00:00.000Z",
+        readByAgentAt: null,
+        readByVisitorAt: null,
+        clientId: null,
+        attachments: [],
+        meta: null,
+      },
+    ],
+    token: "visitor-token",
+    agentTyping: false,
+    hasOlder: true,
+    loadingOlder: false,
+    showOfflineNotice: false,
+    ratingValue: 0,
+    ratingComment: "",
+    ratingSubmitted: false,
+    scrollRef: React.createRef(),
+    onScroll: noop,
+    onLoadOlder: noop,
+    onRatingValueChange: noop,
+    onRatingCommentChange: noop,
+    onSubmitRating: noop,
+    onStartNew: noop,
+  });
+  assert.match(list, /Welcome/);
+  assert.match(list, /Hello visitor/);
+  assert.match(list, /common\.loadOlder/);
+  assert.match(list, /widget-closed-card:true/);
 
   const rating = renderUi(WidgetClosedCard, {
     ratingEnabled: true,

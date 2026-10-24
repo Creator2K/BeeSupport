@@ -420,6 +420,18 @@ export const uiDependencies = {
     MessageBubble: ({ message }) =>
       React.createElement("p", null, message.body),
   },
+  "@/components/agent/message-bubble": {
+    MessageBubble: ({ message }) =>
+      React.createElement("p", null, message.body),
+  },
+  "./widget-closed-card": {
+    WidgetClosedCard: ({ ratingEnabled }) =>
+      React.createElement(
+        "div",
+        null,
+        `widget-closed-card:${Boolean(ratingEnabled)}`,
+      ),
+  },
   "./ai-suggestion-panel": {
     AiSuggestionPanel: ({ text }) =>
       React.createElement("div", null, `ai-suggestion:${text}`),

@@ -12,7 +12,7 @@ import {
   type SendAttempt,
 } from "@/lib/realtime/send-attempt";
 
-import { extractClipboardFiles } from "./workbench-messaging-utils";
+import { extractClipboardFiles } from "@/lib/clipboard-files";
 
 type DraftUpdater = (value: string | ((previous: string) => string)) => void;
 
