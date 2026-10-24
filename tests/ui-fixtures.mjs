@@ -489,6 +489,14 @@ uiDependencies["./admin-nav-user-menu"] = loadModule(
   "src/components/admin/admin-nav-user-menu.tsx",
   uiDependencies,
 );
+uiDependencies["./webhook-form-fields"] = loadModule(
+  "src/app/admin/webhooks/webhook-form-fields.tsx",
+  uiDependencies,
+);
+uiDependencies["./use-webhook-form"] = loadModule(
+  "src/app/admin/webhooks/use-webhook-form.ts",
+  uiDependencies,
+);
 uiDependencies["./risk-pagination"] = loadModule(
   "src/app/admin/risk/risk-pagination.tsx",
   uiDependencies,
