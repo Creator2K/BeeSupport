@@ -91,6 +91,10 @@ function aiFixture() {
     },
     "../transactions": lock,
   };
+  dependencies["./ai-tools"] = loadModule(
+    "src/server/services/ai-tools.ts",
+    dependencies,
+  );
   const module = () => loadModule("src/server/services/ai.ts", dependencies);
   const waitForCalls = async (count) => {
     for (let spin = 0; spin < 50 && state.modelCalls < count; spin += 1)
