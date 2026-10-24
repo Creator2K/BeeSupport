@@ -14,11 +14,13 @@ import { listTransferTargetsAction } from "@/server/actions/agents";
 export function useWorkbenchActions({
   activeId,
   upsertConversation,
-  initialStatus,
+  agentStatus,
+  setAgentStatus,
 }: {
   activeId: string | null;
   upsertConversation: (conversation: SerializedConversation) => void;
-  initialStatus: WorkbenchMe["status"];
+  agentStatus: WorkbenchMe["status"];
+  setAgentStatus: (status: WorkbenchMe["status"]) => void;
 }) {
   const t = useT();
   const [transferOpen, setTransferOpen] = useState(false);
@@ -28,7 +30,6 @@ export function useWorkbenchActions({
   const actionPendingRef = useRef(false);
   const [targets, setTargets] = useState<TransferTarget[]>([]);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-  const [agentStatus, setAgentStatus] = useState(initialStatus);
   const [statusPending, setStatusPending] = useState(false);
 
   async function runAction(
