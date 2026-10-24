@@ -99,3 +99,14 @@ export function loadConversationService(dependencies = {}) {
   );
   return { ...queries, ...actions, ...visitor };
 }
+
+/** Assemble the split message service with explicit test doubles. */
+export function loadMessageService(dependencies = {}) {
+  const write = loadModule("src/server/services/message-write.ts", dependencies);
+  const posting = loadModule("src/server/services/message-posting.ts", {
+    ...dependencies,
+    "./message-write": write,
+  });
+  const read = loadModule("src/server/services/message-read.ts", dependencies);
+  return { ...write, ...posting, ...read };
+}

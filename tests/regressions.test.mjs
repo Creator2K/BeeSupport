@@ -5,6 +5,7 @@ import {
   auth,
   loadAiModule,
   loadConversationService,
+  loadMessageService,
   loadModule,
   nextTurn,
   tenants,
@@ -124,7 +125,7 @@ function messageStore() {
       return work;
     },
   };
-  const service = loadModule("src/server/services/messages.ts", {
+  const service = loadMessageService({
     "./tenants": tenants,
     "../../lib/auth": auth,
     "../../lib/db": { prisma },
