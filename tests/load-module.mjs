@@ -110,3 +110,19 @@ export function loadMessageService(dependencies = {}) {
   const read = loadModule("src/server/services/message-read.ts", dependencies);
   return { ...write, ...posting, ...read };
 }
+
+/** Assemble the split server AI service with explicit test doubles. */
+export function loadAiService(dependencies = {}) {
+  const runner = loadModule("src/server/services/ai-runner.ts", dependencies);
+  const message = loadModule("src/server/services/ai-message.ts", dependencies);
+  const autoReply = loadModule("src/server/services/ai-auto-reply.ts", {
+    ...dependencies,
+    "./ai-runner": runner,
+    "./ai-message": message,
+  });
+  const assistant = loadModule("src/server/services/ai-assistant.ts", {
+    ...dependencies,
+    "./ai-runner": runner,
+  });
+  return { ...runner, ...message, ...autoReply, ...assistant };
+}

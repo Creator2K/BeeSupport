@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadAiModule, loadModule, auth, nextTurn } from "./load-module.mjs";
+import {
+  loadAiModule,
+  loadAiService,
+  loadModule,
+  auth,
+  nextTurn,
+} from "./load-module.mjs";
 
 const lock = loadModule("src/server/transactions.ts");
 const aiHelpers = loadAiModule();
@@ -95,7 +101,7 @@ function aiFixture() {
     "src/server/services/ai-tools.ts",
     dependencies,
   );
-  const module = () => loadModule("src/server/services/ai.ts", dependencies);
+  const module = () => loadAiService(dependencies);
   const waitForCalls = async (count) => {
     for (let spin = 0; spin < 50 && state.modelCalls < count; spin += 1)
       await nextTurn();
