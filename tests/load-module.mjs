@@ -93,10 +93,32 @@ export function loadConversationService(dependencies = {}) {
     "src/server/services/conversation-queries.ts",
     dependencies,
   );
-  const actions = loadModule(
-    "src/server/services/conversation-actions.ts",
+  const actionCore = loadModule(
+    "src/server/services/conversation-action-core.ts",
     dependencies,
   );
+  const actionDetail = loadModule(
+    "src/server/services/conversation-action-detail.ts",
+    {
+      ...dependencies,
+      "./conversation-action-core": actionCore,
+    },
+  );
+  const actionTransitions = loadModule(
+    "src/server/services/conversation-action-transition.ts",
+    {
+      ...dependencies,
+      "./conversation-action-core": actionCore,
+    },
+  );
+  const actionDetails = loadModule(
+    "src/server/services/conversation-action-details.ts",
+    {
+      ...dependencies,
+      "./conversation-action-core": actionCore,
+    },
+  );
+  const actions = { ...actionDetail, ...actionTransitions, ...actionDetails };
   const visitor = loadModule(
     "src/server/services/conversation-visitor.ts",
     {
