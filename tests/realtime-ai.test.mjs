@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   loadAiModule,
   loadAiService,
+  loadAiToolsModule,
   loadModule,
   loadSocketModule,
   auth,
@@ -98,10 +99,7 @@ function aiFixture() {
     },
     "../transactions": lock,
   };
-  dependencies["./ai-tools"] = loadModule(
-    "src/server/services/ai-tools.ts",
-    dependencies,
-  );
+  dependencies["./ai-tools"] = loadAiToolsModule(dependencies);
   const module = () => loadAiService(dependencies);
   const waitForCalls = async (count) => {
     for (let spin = 0; spin < 50 && state.modelCalls < count; spin += 1)

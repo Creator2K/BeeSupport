@@ -178,3 +178,27 @@ export function loadSocketModule(dependencies = {}) {
     "./socket-events": events,
   });
 }
+
+/** Assemble the split AI tool modules with explicit test doubles. */
+export function loadAiToolsModule(dependencies = {}) {
+  const types = loadModule("src/server/services/ai-tool-types.ts", dependencies);
+  const definitions = loadModule(
+    "src/server/services/ai-tool-definitions.ts",
+    dependencies,
+  );
+  const readers = loadModule("src/server/services/ai-tool-readers.ts", {
+    ...dependencies,
+    "./ai-tool-types": types,
+  });
+  const actions = loadModule("src/server/services/ai-tool-actions.ts", {
+    ...dependencies,
+    "./ai-tool-types": types,
+  });
+  const runner = loadModule("src/server/services/ai-tool-runner.ts", {
+    ...dependencies,
+    "./ai-tool-types": types,
+    "./ai-tool-readers": readers,
+    "./ai-tool-actions": actions,
+  });
+  return { ...types, ...definitions, ...readers, ...actions, ...runner };
+}
