@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { loadModule, nextTurn } from "./load-module.mjs";
+import {
+  loadModule,
+  loadWebhookModule,
+  nextTurn,
+} from "./load-module.mjs";
 
 function fixture(endpoints = []) {
   const updates = [];
@@ -13,7 +17,7 @@ function fixture(endpoints = []) {
       },
     },
   });
-  const hooks = loadModule("src/lib/webhooks.ts", {
+  const hooks = loadWebhookModule({
     "./public-webhook": {
       postPublicWebhook: (...args) => globalThis.fetch(...args),
     },

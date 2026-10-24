@@ -133,3 +133,23 @@ export function loadAiService(dependencies = {}) {
   });
   return { ...runner, ...message, ...autoReply, ...assistant };
 }
+
+/** Assemble the split webhook module with explicit test doubles. */
+export function loadWebhookModule(dependencies = {}) {
+  const types = loadModule("src/lib/webhook-types.ts");
+  const request = loadModule("src/lib/webhook-request.ts", {
+    ...dependencies,
+    "./webhook-types": types,
+  });
+  const delivery = loadModule("src/lib/webhook-delivery.ts", {
+    ...dependencies,
+    "./webhook-types": types,
+    "./webhook-request": request,
+  });
+  const test = loadModule("src/lib/webhook-test.ts", {
+    ...dependencies,
+    "./webhook-types": types,
+    "./webhook-request": request,
+  });
+  return { ...types, ...request, ...delivery, ...test };
+}
