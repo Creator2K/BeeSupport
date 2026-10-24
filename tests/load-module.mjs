@@ -64,3 +64,18 @@ export const tenants = {
   assertTenantQuota: async () => {},
   assertSiteServing: async () => {},
 };
+
+/** Assemble the split AI library with explicit test doubles. */
+export function loadAiModule(prisma = {}) {
+  const db = { prisma };
+  const config = loadModule("src/lib/ai-config.ts", { "./db": db });
+  const provider = loadModule("src/lib/ai-provider.ts", {
+    "./ai-config": config,
+  });
+  const knowledge = loadModule("src/lib/ai-knowledge.ts", {
+    "./db": db,
+    "./ai-config": config,
+    "./ai-provider": provider,
+  });
+  return { ...config, ...provider, ...knowledge };
+}

@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadModule, auth, nextTurn } from "./load-module.mjs";
+import { loadAiModule, loadModule, auth, nextTurn } from "./load-module.mjs";
 
 const lock = loadModule("src/server/transactions.ts");
-const aiHelpers = loadModule("src/lib/ai.ts", { "./db": { prisma: {} } });
+const aiHelpers = loadAiModule();
 
 function aiFixture() {
   const state = {

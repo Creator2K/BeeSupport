@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { loadModule, auth, nextTurn, tenants } from "./load-module.mjs";
+import {
+  auth,
+  loadAiModule,
+  loadModule,
+  nextTurn,
+  tenants,
+} from "./load-module.mjs";
 import {
   restoreSetting,
   useTestDatabase,
@@ -493,15 +499,11 @@ test("knowledge retrieval caches bounded site data and invalidates on edits", as
     keywords: ["refund"],
     chunks: [],
   };
-  const ai = loadModule("src/lib/ai.ts", {
-    "./db": {
-      prisma: {
-        aiKnowledge: {
-          findMany: async ({ select }) => {
-            if (select.content) reads += 1;
-            return [entry];
-          },
-        },
+  const ai = loadAiModule({
+    aiKnowledge: {
+      findMany: async ({ select }) => {
+        if (select.content) reads += 1;
+        return [entry];
       },
     },
   });
@@ -548,10 +550,8 @@ test("knowledge moved out of a site's scope is not served from another instance'
       chunks: [],
     },
   ];
-  const ai = loadModule("src/lib/ai.ts", {
-    "./db": {
-      prisma: { aiKnowledge: { findMany: async () => structuredClone(rows) } },
-    },
+  const ai = loadAiModule({
+    aiKnowledge: { findMany: async () => structuredClone(rows) },
   });
   const request = { siteId: "s1", query: "refund", topK: 4 };
   assert.equal((await ai.retrieveKnowledge(request)).length, 1);
