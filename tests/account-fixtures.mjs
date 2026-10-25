@@ -42,12 +42,40 @@ export function accountService(prisma, options = {}) {
     dependencies,
   );
   const tokens = loadModule("src/server/services/account-tokens.ts", dependencies);
+  const invitationSchema = loadModule(
+    "src/server/services/account-invitation-schema.ts",
+    dependencies,
+  );
+  const invitationManagement = loadModule(
+    "src/server/services/account-invitation-management.ts",
+    {
+      ...dependencies,
+      "./account-invitation-schema": invitationSchema,
+    },
+  );
+  const invitationCreate = loadModule(
+    "src/server/services/account-invitation-create.ts",
+    {
+      ...dependencies,
+      "./account-credentials": credentials,
+      "./account-invitation-schema": invitationSchema,
+    },
+  );
+  const invitationAccept = loadModule(
+    "src/server/services/account-invitation-accept.ts",
+    {
+      ...dependencies,
+      "./account-tokens": tokens,
+    },
+  );
   const invitations = loadModule(
     "src/server/services/account-invitations.ts",
     {
       ...dependencies,
-      "./account-credentials": credentials,
-      "./account-tokens": tokens,
+      "./account-invitation-schema": invitationSchema,
+      "./account-invitation-management": invitationManagement,
+      "./account-invitation-create": invitationCreate,
+      "./account-invitation-accept": invitationAccept,
     },
   );
   return { ...credentials, ...tokens, ...invitations };
