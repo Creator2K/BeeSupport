@@ -128,6 +128,8 @@ test("merchant AI policy page saves an isolated tenant policy", { timeout: 60_00
     if (tenant) {
       await db.site.deleteMany({ where: { tenantId: tenant.id } });
       await db.user.deleteMany({ where: { tenantId: tenant.id } });
+      // Signing in and saving the policy write audit rows; the tenant cannot be deleted while they exist.
+      await db.auditLog.deleteMany({ where: { tenantId: tenant.id } });
       await db.tenant.deleteMany({ where: { id: tenant.id } });
     }
     await db.$disconnect();
