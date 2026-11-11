@@ -469,6 +469,7 @@ pnpm e2e:ai-queue   # AI 索引排队、失败重试及桌面/手机亮暗主题
 pnpm e2e:ai-policy  # 商家 AI 策略页面、保存和隔离验收（同样要求独立测试实例）
 pnpm eval:ai-quality --site-slug your-site # 固定问题集真实模型回归并保存 JSON 报告
 pnpm e2e:frontend   # Chromium 前端交互与无障碍回归（同样要求独立测试实例）
+pnpm e2e:browser e2e:tenants e2e:growth # 依次运行多套浏览器验收并汇总结果；需要应用的套件会各自启动新的生产服务（先 pnpm build）
 pnpm smoke          # 数据层冒烟（要求 TEST_DATABASE_URL）
 pnpm uploads:cleanup # 预览超过 24 小时的未发送附件和孤儿文件
 pnpm db:seed        # 演示数据（幂等）
@@ -482,6 +483,12 @@ pnpm check          # 一键执行类型检查、ESLint 和隔离回归测试
 邮件由本地 SMTP 接收器捕获；截图、结果及服务日志作为 `browser-results` 工件保留 7 天。
 AI 索引和商家策略浏览器验收另外启动连接 CI 测试库的应用；索引测试使用本地向量接口替身，策略测试创建并清理独立商家。
 可用 `ACCOUNT_E2E_ARTIFACTS` 指定本地结果目录；未指定时使用系统临时目录下的 `beesupport-account-results`。
+
+其余浏览器验收在单独的 `browser` 任务里分四组并行运行（agents、merchants、platform、known-issues）。
+每组使用自己的临时 PostgreSQL，由 `pnpm e2e:browser` 依次执行并把结果写入任务摘要；截图和服务日志作为
+`browser-<组名>` 工件保留 7 天。`e2e:demo-navigation` 会留下演示商家数据，所以排在所在组的最后。
+`known-issues` 组运行尚未修复的 `e2e:collection`（通知「标为已读」后页面不更新，见 `docs/TODO.md`），
+它失败时不会让整个工作流失败；修好后把它移回普通分组。
 
 `scripts/e2e.mjs` 覆盖登录与 RBAC、**随机后台入口（/admin 返回 404）**、访客邮箱门槛、
 排队与自动分配、接入/转接权限、双向实时（消息 / 输入中 / 状态变更）、文件上传与三态鉴权
