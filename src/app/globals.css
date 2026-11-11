@@ -6,81 +6,141 @@
   --success-text: #166534;
 }
 
-/* 亮色为主、暗色可切：用 class 策略（next-themes attribute="class"） */
-@custom-variant dark (&:is(.dark *));
+/* 亮色为主、暗色可切：用 class 策略（next-themes attribute="class"）。
+   .surface-ink 是亮色模式下也保持墨色的区域（侧栏、品牌面板），里面的 dark: 样式同样生效。 */
+@custom-variant dark (&:is(.dark *, .surface-ink *));
 
+/* ---------- 设计变量：墨色 × 蜂蜜金 ---------- */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  /* 中性色都带一点暖调：纸面做背景，墨色做文字和主按钮 */
+  --background: oklch(0.984 0.004 85);
+  --foreground: oklch(0.205 0.012 65);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.205 0.012 65);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.871 0.006 286.286);
-  --chart-2: oklch(0.552 0.016 285.938);
-  --chart-3: oklch(0.442 0.017 285.786);
-  --chart-4: oklch(0.37 0.013 285.805);
-  --chart-5: oklch(0.274 0.006 286.033);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --popover-foreground: oklch(0.205 0.012 65);
+  --primary: oklch(0.225 0.012 65);
+  --primary-foreground: oklch(0.984 0.004 85);
+  --secondary: oklch(0.955 0.006 85);
+  --secondary-foreground: oklch(0.225 0.012 65);
+  --muted: oklch(0.962 0.005 85);
+  --muted-foreground: oklch(0.49 0.012 65);
+  --accent: oklch(0.95 0.008 85);
+  --accent-foreground: oklch(0.225 0.012 65);
+  --destructive: oklch(0.56 0.215 27);
+  --border: oklch(0.914 0.006 85);
+  --input: oklch(0.89 0.008 85);
+  --ring: oklch(0.7 0.15 72);
+
+  /* 品牌强调色。brand-strong 用在浅色底的文字上，brand-soft 用作浅色衬底 */
+  --brand: oklch(0.8 0.145 82);
+  --brand-foreground: oklch(0.22 0.04 70);
+  --brand-strong: oklch(0.5 0.11 70);
+  --brand-soft: oklch(0.965 0.04 92);
+  --success: oklch(0.6 0.14 160);
+  --warning: oklch(0.75 0.15 75);
+  --info: oklch(0.6 0.12 245);
+
+  /* 自己发出的消息气泡：亮色用墨色；暗色用压低的暖棕，避免整屏蜂蜜色 */
+  --bubble: oklch(0.225 0.012 65);
+  --bubble-foreground: oklch(0.984 0.004 85);
+
+  --chart-1: oklch(0.78 0.145 80);
+  --chart-2: oklch(0.42 0.02 65);
+  --chart-3: oklch(0.66 0.13 165);
+  --chart-4: oklch(0.68 0.14 45);
+  --chart-5: oklch(0.62 0.09 250);
+
+  /* 侧栏在亮色模式下也是墨色 */
+  --sidebar: oklch(0.185 0.01 65);
+  --sidebar-foreground: oklch(0.955 0.006 85);
+  --sidebar-primary: oklch(0.8 0.145 82);
+  --sidebar-primary-foreground: oklch(0.22 0.04 70);
+  --sidebar-accent: oklch(1 0 0 / 8%);
+  --sidebar-accent-foreground: oklch(0.985 0.004 85);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.8 0.145 82);
+
+  --shadow-tint: oklch(0.3 0.04 65 / 6%);
+  --shadow-tint-strong: oklch(0.3 0.04 65 / 13%);
 
   color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: oklch(0.165 0.008 65);
+  --foreground: oklch(0.955 0.006 85);
+  --card: oklch(0.205 0.01 65);
+  --card-foreground: oklch(0.955 0.006 85);
+  --popover: oklch(0.225 0.011 65);
+  --popover-foreground: oklch(0.955 0.006 85);
+  --primary: oklch(0.8 0.145 82);
+  --primary-foreground: oklch(0.22 0.04 70);
+  --secondary: oklch(0.27 0.011 65);
+  --secondary-foreground: oklch(0.955 0.006 85);
+  --muted: oklch(0.25 0.01 65);
+  --muted-foreground: oklch(0.72 0.012 80);
+  --accent: oklch(0.275 0.012 65);
+  --accent-foreground: oklch(0.985 0.004 85);
+  --destructive: oklch(0.68 0.19 24);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.871 0.006 286.286);
-  --chart-2: oklch(0.552 0.016 285.938);
-  --chart-3: oklch(0.442 0.017 285.786);
-  --chart-4: oklch(0.37 0.013 285.805);
-  --chart-5: oklch(0.274 0.006 286.033);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --ring: oklch(0.8 0.145 82);
+
+  --brand-strong: oklch(0.84 0.13 85);
+  --brand-soft: oklch(0.8 0.145 82 / 14%);
+  --success: oklch(0.72 0.15 160);
+  --warning: oklch(0.8 0.14 80);
+  --info: oklch(0.72 0.11 245);
+  --bubble: oklch(0.37 0.05 75);
+  --bubble-foreground: oklch(0.975 0.012 85);
+
+  --chart-2: oklch(0.86 0.01 85);
+  --chart-3: oklch(0.72 0.13 165);
+  --chart-4: oklch(0.72 0.14 45);
+  --chart-5: oklch(0.7 0.09 250);
+
+  --sidebar: oklch(0.14 0.008 65);
+
+  --shadow-tint: oklch(0 0 0 / 32%);
+  --shadow-tint-strong: oklch(0 0 0 / 50%);
 
   color-scheme: dark;
+}
+
+/* 墨色区域：在这个容器里重新定义语义变量，里面的组件不用改类名就换成深色配色 */
+.surface-ink {
+  --background: oklch(0.185 0.01 65);
+  --foreground: oklch(0.955 0.006 85);
+  --card: oklch(0.225 0.011 65);
+  --card-foreground: oklch(0.955 0.006 85);
+  --popover: oklch(0.225 0.011 65);
+  --popover-foreground: oklch(0.955 0.006 85);
+  --primary: oklch(0.8 0.145 82);
+  --primary-foreground: oklch(0.22 0.04 70);
+  --secondary: oklch(1 0 0 / 8%);
+  --secondary-foreground: oklch(0.955 0.006 85);
+  --muted: oklch(1 0 0 / 7%);
+  --muted-foreground: oklch(0.72 0.012 80);
+  --accent: oklch(1 0 0 / 8%);
+  --accent-foreground: oklch(0.985 0.004 85);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.8 0.145 82);
+  --brand-strong: oklch(0.84 0.13 85);
+  --brand-soft: oklch(0.8 0.145 82 / 14%);
+  --shadow-tint: oklch(0 0 0 / 32%);
+  --shadow-tint-strong: oklch(0 0 0 / 50%);
+
+  color: var(--foreground);
+  color-scheme: dark;
+}
+
+.dark .surface-ink {
+  --background: oklch(0.14 0.008 65);
+  --card: oklch(0.19 0.01 65);
 }
 
 @theme inline {
@@ -102,6 +162,15 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-bubble: var(--bubble);
+  --color-bubble-foreground: var(--bubble-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -120,6 +189,22 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+
+  /* 阴影带暖调，近处一层定边缘、远处一层定高度；暗色下改用更深的黑 */
+  --shadow-2xs: 0 1px 0 var(--shadow-tint);
+  --shadow-xs: 0 1px 2px var(--shadow-tint);
+  --shadow-sm: 0 1px 2px var(--shadow-tint), 0 2px 6px -2px var(--shadow-tint);
+  --shadow-md:
+    0 2px 4px -1px var(--shadow-tint), 0 8px 16px -6px var(--shadow-tint-strong);
+  --shadow-lg:
+    0 4px 8px -2px var(--shadow-tint), 0 18px 36px -12px var(--shadow-tint-strong);
+  --shadow-xl:
+    0 8px 16px -4px var(--shadow-tint), 0 32px 64px -20px var(--shadow-tint-strong);
+  --shadow-2xl:
+    0 16px 32px -12px var(--shadow-tint-strong),
+    0 48px 96px -28px var(--shadow-tint-strong);
 
   /* 不依赖构建期联网：直接用系统字体栈，中英文都有良好回退 */
   --font-sans:
@@ -143,6 +228,16 @@
   body {
     @apply bg-background text-foreground;
     text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.012em;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--brand) 42%, transparent);
   }
 
   /* 细窄滚动条，保持克制的社区产品质感 */
@@ -308,6 +403,99 @@
     );
     animation: bee-shimmer 1.6s infinite;
   }
+
+  /* 蜂巢纹理：铺在容器背景之上、内容之下，向远处淡出。
+     颜色跟随文字色；--pattern-opacity 调浓淡，--pattern-origin 调最浓的位置 */
+  .pattern-hex {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .pattern-hex::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: currentColor;
+    opacity: var(--pattern-opacity, 0.06);
+    -webkit-mask-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath fill='%23000' fill-rule='evenodd' d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E"),
+      radial-gradient(
+        ellipse at var(--pattern-origin, 50% 0%),
+        #000 0%,
+        transparent 72%
+      );
+    mask-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cpath fill='%23000' fill-rule='evenodd' d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E"),
+      radial-gradient(
+        ellipse at var(--pattern-origin, 50% 0%),
+        #000 0%,
+        transparent 72%
+      );
+    -webkit-mask-size:
+      36px 63px,
+      100% 100%;
+    mask-size:
+      36px 63px,
+      100% 100%;
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+
+  /* 半透明顶栏：透出下层内容的色块，但保持文字可读 */
+  .glass {
+    background-color: color-mix(in oklab, var(--background) 82%, transparent);
+    -webkit-backdrop-filter: saturate(1.6) blur(14px);
+    backdrop-filter: saturate(1.6) blur(14px);
+  }
+
+  /* 小号全大写标签：区块的「眉标」 */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-strong);
+  }
+
+  /* 蜂蜜金渐变文字，只用在深色底的大标题上 */
+  .text-honey {
+    background-image: linear-gradient(
+      100deg,
+      oklch(0.88 0.13 92),
+      oklch(0.76 0.16 68)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 顶部的一抹蜂蜜色光晕，用在墨色区域 */
+  .glow-honey {
+    background-image: radial-gradient(
+      70% 55% at var(--glow-origin, 50% 0%),
+      color-mix(in oklab, var(--brand) 20%, transparent),
+      transparent 70%
+    );
+  }
+
+  /* 可点卡片：悬停时抬起并加深阴影 */
+  .card-lift {
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 8px -2px var(--shadow-tint),
+      0 18px 36px -12px var(--shadow-tint-strong);
+    border-color: color-mix(in oklab, var(--foreground) 14%, transparent);
+  }
 }
 
 @keyframes bee-shimmer {
@@ -328,7 +516,8 @@
   }
 
   .press:hover,
-  .press:active {
+  .press:active,
+  .card-lift:hover {
     transform: none;
   }
 }
