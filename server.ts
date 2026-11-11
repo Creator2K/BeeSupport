@@ -16,11 +16,18 @@ import { registerRealtime } from "./src/server/socket";
 import { expireStaleAgents } from "./src/server/presence";
 import { createClientIpResolver, setClientIp } from "./src/server/client-ip";
 import {
+  isSocketOriginAllowed,
+  parseSocketOrigins,
+} from "./src/server/socket-origin";
+import { securityHeaders } from "./src/server/security-headers";
+import { deploymentWarnings } from "./src/server/deployment-warnings";
+import {
   requestPath,
   runWithRequestContext,
 } from "./src/server/request-context";
 import { startNotificationWorker } from "./src/server/notification-worker";
 import { startAiWorker } from "./src/server/ai-worker";
+import { startMaintenanceWorker } from "./src/server/maintenance-worker";
 import { startSubscriptionReminderWorker } from "./src/server/services/subscription-reminders";
 import { startUnansweredReminderWorker } from "./src/server/services/unanswered";
 
@@ -33,6 +40,11 @@ const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 3000);
 const hostname = process.env.BIND_HOST || "0.0.0.0";
 const resolveClientIp = createClientIpResolver(process.env.TRUSTED_PROXY_CIDRS);
+const socketOrigins = parseSocketOrigins(
+  process.env.APP_URL,
+  process.env.SOCKET_ALLOWED_ORIGINS,
+);
+const httpsApp = (process.env.APP_URL ?? "").startsWith("https://");
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -47,6 +59,10 @@ async function main(): Promise<void> {
     const path = requestPath(req.url);
     const context = { requestId, method, path, startedAt };
     res.setHeader("x-request-id", requestId);
+    for (const [name, value] of Object.entries(
+      securityHeaders(path, { https: httpsApp }),
+    ))
+      res.setHeader(name, value);
 
     let accessLogged = false;
     const logAccess = (aborted: boolean) => {
@@ -117,7 +133,20 @@ async function main(): Promise<void> {
     pingInterval: 20_000,
     pingTimeout: 25_000,
     maxHttpBufferSize: 1_000_000,
-    cors: { origin: true, credentials: true },
+    cors: { origin: socketOrigins, credentials: true },
+    allowRequest: (req, callback) => {
+      const allowed = isSocketOriginAllowed({
+        origin: req.headers.origin,
+        host: req.headers.host,
+        allowedOrigins: socketOrigins,
+      });
+      if (!allowed) {
+        logger.warn("realtime.origin_rejected", {
+          origin: String(req.headers.origin).slice(0, 200),
+        });
+      }
+      callback(allowed ? null : "origin not allowed", allowed);
+    },
   });
 
   const pubClient = createRedisClient();
@@ -134,6 +163,7 @@ async function main(): Promise<void> {
   const stopAi = startAiWorker();
   const stopReminders = startSubscriptionReminderWorker();
   const stopUnanswered = startUnansweredReminderWorker();
+  const stopMaintenance = startMaintenanceWorker();
   const expirePresence = () =>
     void expireStaleAgents().catch((error: unknown) =>
       logger.error("presence.cleanup_failed", {}, error),
@@ -152,6 +182,12 @@ async function main(): Promise<void> {
       agentUrl: `${baseUrl}/agent`,
       adminUrl: `${baseUrl}${ADMIN_PATH}`,
     });
+    for (const warning of deploymentWarnings({
+      production: !dev,
+      appUrl: process.env.APP_URL,
+      databaseUrl: process.env.DATABASE_URL,
+    }))
+      logger.warn(warning.event, { hint: warning.hint });
 
     // 后台开了「启用微信通知」就随服务一起登录，避免重启后漏掉提醒
     void (async () => {
@@ -177,6 +213,7 @@ async function main(): Promise<void> {
         stopAi(),
         stopReminders(),
         stopUnanswered(),
+        stopMaintenance(),
         new Promise<void>((resolve) => io.close(() => resolve())),
       ]);
       await app.close();

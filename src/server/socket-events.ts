@@ -78,7 +78,19 @@ export function registerSocketEvents({
       : null;
   };
 
+  // 按身份计数而不是按连接：同一个人多开连接不能把额度翻倍
+  const actor = identity.user
+    ? `user:${identity.user.id}`
+    : `visitor:${identity.visitor?.visitorId}`;
+  const withinLimit = async (event: string, limit: number, seconds: number) =>
+    (await rateLimit(`socket:${event}:${actor}`, limit, seconds)).ok;
+
   handle("conversation:join", async (payload, ack) => {
+    // 没有缓存的会话每次加入都要查一次库
+    if (!(await withinLimit("join", 30, 10))) {
+      ack?.({ ok: false, error: "操作过于频繁，请稍后再试" });
+      return;
+    }
     const conversation = await accessibleConversation(
       payload?.conversationId,
     );
@@ -117,6 +129,8 @@ export function registerSocketEvents({
       (status !== "ONLINE" && status !== "AWAY" && status !== "OFFLINE")
     )
       return;
+    // 每次切换都写库并向同事广播
+    if (!(await withinLimit("status", 10, 10))) return;
     await prisma.user.update({
       where: { id: current.user.id },
       data: { status, lastSeenAt: new Date() },

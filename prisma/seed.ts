@@ -10,13 +10,27 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const DEMO_PASSWORD = "ChangeMe123!";
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? "admin@beesupport.local";
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? DEMO_PASSWORD;
 const AGENT_EMAIL = process.env.SEED_AGENT_EMAIL ?? "agent@beesupport.local";
-const AGENT_PASSWORD = process.env.SEED_AGENT_PASSWORD ?? "ChangeMe123!";
+const AGENT_PASSWORD = process.env.SEED_AGENT_PASSWORD ?? DEMO_PASSWORD;
 const AGENT2_EMAIL = process.env.SEED_AGENT2_EMAIL ?? "agent2@beesupport.local";
 
+/** 自己设置的密码不回显到终端，只有公开的演示密码才打印。 */
+const shownPassword = (password: string) =>
+  password === DEMO_PASSWORD ? password : "（环境变量中设置的密码）";
+
 async function main() {
+  // 演示密码写在公开仓库里，生产环境用它等于管理员账号不设防
+  if (
+    process.env.NODE_ENV === "production" &&
+    (ADMIN_PASSWORD === DEMO_PASSWORD || AGENT_PASSWORD === DEMO_PASSWORD)
+  ) {
+    throw new Error(
+      "生产环境不能使用默认演示密码，请先设置 SEED_ADMIN_PASSWORD 和 SEED_AGENT_PASSWORD",
+    );
+  }
   await prisma.tenant.upsert({
     where: { id: "legacy" },
     create: {
@@ -333,9 +347,11 @@ async function main() {
   }
 
   console.log("✅ 初始化完成，登录信息：");
-  console.log(`   管理员：${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  console.log(`   客服：  ${AGENT_EMAIL} / ${AGENT_PASSWORD}`);
-  console.log(`   客服2： ${AGENT2_EMAIL} / ${AGENT_PASSWORD}（用于转接演示）`);
+  console.log(`   管理员：${ADMIN_EMAIL} / ${shownPassword(ADMIN_PASSWORD)}`);
+  console.log(`   客服：  ${AGENT_EMAIL} / ${shownPassword(AGENT_PASSWORD)}`);
+  console.log(
+    `   客服2： ${AGENT2_EMAIL} / ${shownPassword(AGENT_PASSWORD)}（用于转接演示）`,
+  );
   console.log(
     `   管理后台入口：${process.env.ADMIN_PATH ?? "/admin"}（可用 ADMIN_PATH 改成随机路径）`,
   );

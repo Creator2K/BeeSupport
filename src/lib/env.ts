@@ -8,6 +8,8 @@ const placeholderSecrets = new Set([
   "ci-placeholder-secret-for-prisma-generate",
 ]);
 
+const retentionDays = z.coerce.number().int().min(0).max(36500).default(0);
+
 /**
  * 环境变量集中校验。任何一处缺失都会在启动阶段直接失败，
  * 避免把配置问题拖到运行期才暴露。
@@ -53,6 +55,13 @@ const schema = z.object({
     .int()
     .positive()
     .default(20 * 1024 * 1024),
+  // 同时处理的上传请求数：每个上传在内存里要占文件大小的数倍
+  UPLOAD_MAX_CONCURRENT: z.coerce.number().int().positive().max(64).default(4),
+
+  // 数据保留天数，由每小时的维护任务删除更早的数据；0 表示不清理（默认）
+  RISK_EVENT_RETENTION_DAYS: retentionDays,
+  AUDIT_LOG_RETENTION_DAYS: retentionDays,
+  ANONYMOUS_VISITOR_RETENTION_DAYS: retentionDays,
 
   // 个人微信通知（进程内扫码登录），凭证目录默认落在 UPLOAD_DIR 下
   WECHATBOT_ENABLED: z

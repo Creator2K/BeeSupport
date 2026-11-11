@@ -7,7 +7,12 @@ import {
   assertTenantQuota,
   assertSiteServing,
 } from "@/server/services/tenants";
-import { deleteUpload, readUploadForm, saveUpload } from "@/lib/storage";
+import {
+  acquireUploadSlot,
+  deleteUpload,
+  readUploadForm,
+  saveUpload,
+} from "@/lib/storage";
 
 /**
  * 客服上传附件：先把文件落盘并把 Attachment 记成「未绑定消息」，
@@ -15,8 +20,10 @@ import { deleteUpload, readUploadForm, saveUpload } from "@/lib/storage";
  */
 export async function POST(request: Request): Promise<NextResponse> {
   let storageKey: string | undefined;
+  let releaseSlot: (() => void) | undefined;
   try {
     const user = await requireUser();
+    releaseSlot = await acquireUploadSlot(`agent:${user.id}`);
     const formData = await readUploadForm(request);
     const file = formData.get("file");
     const siteId = String(formData.get("siteId") ?? "");
@@ -77,5 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error) {
     if (storageKey) await deleteUpload(storageKey).catch(console.error);
     return toErrorResponse(error);
+  } finally {
+    releaseSlot?.();
   }
 }

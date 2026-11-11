@@ -51,7 +51,13 @@ export async function sendToEndpoint(
   deliveryId?: string,
   publicOnly = false,
 ): Promise<DeliveryResult> {
-  const { body, headers } = buildRequest(type, url, secret, payload);
+  const { body, headers } = buildRequest(
+    type,
+    url,
+    secret,
+    payload,
+    deliveryId,
+  );
   if (deliveryId) headers["x-beesupport-delivery-id"] = deliveryId;
 
   const response = publicOnly
@@ -140,15 +146,35 @@ export async function sendViaInternalBot(
   return sendWechatText(target, buildPlainText(payload));
 }
 
+const FULL_WIDTH: Record<string, string> = {
+  "[": "［",
+  "]": "］",
+  "<": "＜",
+  ">": "＞",
+};
+
+/**
+ * 钉钉和企业微信的 Markdown 没有转义写法，访客写的内容原样拼进去会被当成语法：
+ * 伪装成「打开会话」的链接、自动加载的外链图片、@ 群成员、带颜色的标签、大号标题。
+ * 这里把方括号、尖括号和行首的 # 换成全角，读起来一样，但不再被解析。
+ * 加粗、斜体、行内代码只影响那段文字自己的样式，不处理：下划线常见于邮箱，星号常见于正常文字。
+ */
+function markdownText(value: string): string {
+  return value
+    .replace(/[[\]<>]/g, (character) => FULL_WIDTH[character]!)
+    .replace(/^([^\S\r\n]*)#/gm, "$1＃");
+}
+
 function buildRequest(
   type: WebhookType,
   url: string,
   secret: string | null,
   payload: WebhookPayload,
+  deliveryId?: string,
 ): { body: Record<string, unknown>; headers: Record<string, string> } {
   const markdown = [
-    `**${payload.title}**`,
-    payload.text,
+    `**${markdownText(payload.title)}**`,
+    markdownText(payload.text),
     payload.url ? `[打开会话](${payload.url})` : "",
   ]
     .filter(Boolean)
@@ -201,8 +227,16 @@ function buildRequest(
         "x-beesupport-event": payload.event,
       };
       if (secret) {
+        // 旧签名只覆盖请求体，截获的请求可以原样重放；已接入的接收方按它校验，所以保留
         headers["x-beesupport-signature"] = createHmac("sha256", secret)
           .update(raw)
+          .digest("hex");
+        // 新签名把发送时刻和投递编号一起签进去：接收方拒绝过期的时间戳、按投递编号去重，就能挡住重放。
+        // 后台「测试推送」没有投递编号，那一段按空字符串算
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        headers["x-beesupport-timestamp"] = timestamp;
+        headers["x-beesupport-signature-v2"] = createHmac("sha256", secret)
+          .update(`${timestamp}.${deliveryId ?? ""}.${raw}`)
           .digest("hex");
       }
       return { body: payload as unknown as Record<string, unknown>, headers };

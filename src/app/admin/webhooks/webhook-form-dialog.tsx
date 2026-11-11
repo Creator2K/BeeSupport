@@ -58,6 +58,8 @@ export function WebhookFormDialog({
             type={form.type}
             url={form.url}
             secret={form.secret}
+            secretKept={form.secretKept}
+            clearSecret={form.clearSecret}
             events={form.events}
             siteId={form.siteId}
             active={form.active}
@@ -68,6 +70,7 @@ export function WebhookFormDialog({
             setType={form.setType}
             setUrl={form.setUrl}
             setSecret={form.setSecret}
+            setClearSecret={form.setClearSecret}
             setSiteId={form.setSiteId}
             setActive={form.setActive}
             toggleEvent={form.toggleEvent}

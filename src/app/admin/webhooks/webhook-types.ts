@@ -11,7 +11,7 @@ export type WebhookRecord = {
     | "WECHAT"
     | "WECHAT_BOT";
   url: string;
-  secret: string | null;
+  secretSet: boolean;
   events: string[];
   siteId: string | null;
   siteName: string | null;

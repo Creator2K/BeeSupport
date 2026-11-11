@@ -64,9 +64,9 @@ export function WebhooksClient({
     const result = await callClientAction(
       () =>
         testWebhookAction({
+          id: endpoint.id,
           type: endpoint.type,
           url: endpoint.url,
-          secret: endpoint.secret,
           siteId: endpoint.siteId,
         }),
       t("common.operationFailed"),

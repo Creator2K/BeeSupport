@@ -4,7 +4,9 @@ import { z } from "zod";
 import {
   AI_SETTING_KEY,
   AiError,
+  getAiConfig,
   listAiModels,
+  normalizeBaseUrl,
 } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
@@ -17,12 +19,27 @@ import {
   type AiSettingsInput,
 } from "./ai-schemas";
 
+/**
+ * 密钥不下发给浏览器，表单留空表示沿用已保存的值。只在接口地址没变时沿用，
+ * 否则已保存的密钥会被发给一个新填的地址。
+ */
+async function withStoredApiKey<T extends { baseUrl: string; apiKey: string }>(
+  input: T,
+): Promise<T> {
+  if (input.apiKey.trim()) return input;
+  const current = await getAiConfig();
+  if (!current.apiKey) return input;
+  if (normalizeBaseUrl(input.baseUrl) !== normalizeBaseUrl(current.baseUrl))
+    throw new AiError("修改接口地址后需要重新填写 API Key");
+  return { ...input, apiKey: current.apiKey };
+}
+
 export async function saveAiSettingsAction(
   input: AiSettingsInput,
 ): Promise<ActionResult> {
   try {
     const admin = await requirePlatformAdmin();
-    const data = aiSettingsSchema.parse(input);
+    const data = await withStoredApiKey(aiSettingsSchema.parse(input));
 
     // 默认模型必须在清单里，否则工作台模型切换会指向一个不存在的模型
     const models = Array.from(
@@ -54,6 +71,7 @@ export async function saveAiSettingsAction(
     revalidatePath("/admin", "layout");
     return { ok: true, message: "AI 配置已保存" };
   } catch (error) {
+    if (error instanceof AiError) return { ok: false, error: error.message };
     return toActionResult(error);
   }
 }
@@ -65,10 +83,12 @@ export async function listAiModelsAction(input: {
 }): Promise<{ ok: boolean; models?: string[]; error?: string }> {
   try {
     await requirePlatformAdmin();
-    const models = await listAiModels({
-      baseUrl: input.baseUrl,
-      apiKey: input.apiKey,
-    });
+    const models = await listAiModels(
+      await withStoredApiKey({
+        baseUrl: input.baseUrl,
+        apiKey: input.apiKey,
+      }),
+    );
     return { ok: true, models };
   } catch (error) {
     return {
@@ -84,7 +104,7 @@ export async function testAiAction(
   try {
     const admin = await requirePlatformAdmin();
     const prompt = z.string().trim().min(1).max(500).parse(input.prompt);
-    const config = toConfig(input);
+    const config = await withStoredApiKey(toConfig(input));
 
     const result = await testAiConnection({ config, prompt });
     await recordAudit({

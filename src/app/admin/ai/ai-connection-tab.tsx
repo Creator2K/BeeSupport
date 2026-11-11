@@ -13,6 +13,7 @@ import type {
 
 type AiConnectionTabProps = {
   form: AiFormState;
+  apiKeySet: boolean;
   modelOptions: string[];
   loadingModels: boolean;
   testing: boolean;
@@ -30,6 +31,7 @@ type AiConnectionTabProps = {
 
 export function AiConnectionTab({
   form,
+  apiKeySet,
   modelOptions,
   loadingModels,
   testing,
@@ -48,6 +50,7 @@ export function AiConnectionTab({
     <TabsContent value="connection" className="mt-4 space-y-4">
       <AiConnectionConfigCard
         form={form}
+        apiKeySet={apiKeySet}
         modelOptions={modelOptions}
         loadingModels={loadingModels}
         onUpdate={onUpdate}

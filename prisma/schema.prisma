@@ -426,6 +426,7 @@ model Message {
   attachments  Attachment[]
 
   @@index([conversationId, createdAt])
+  @@index([authorId])
   @@unique([conversationId, clientId])
 }
 
@@ -539,6 +540,8 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([action])
+  @@index([actorId])
+  @@index([tenantId, createdAt])
 }
 
 model RiskRule {

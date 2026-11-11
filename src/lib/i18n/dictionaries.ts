@@ -138,6 +138,8 @@ export const zhCN = {
   "common.operationFailed": "操作失败，请重试",
   "common.deleteConfirm": "删除后不可恢复，确认删除吗？",
   "common.searchPlaceholder": "搜索…",
+  "common.secretKept": "已保存，留空则不修改",
+  "common.secretClear": "清除已保存的密钥",
 
   // ---------- 登录 ----------
   "auth.title": "登录 BeeSupport",
@@ -700,7 +702,7 @@ export const zhCN = {
   "webhooks.wechatGoLogin": "去扫码登录",
   "webhooks.urlHintWechatBot": "http://127.0.0.1:8787/send?to=<wxid 或备注名>",
   "webhooks.wechatBridgeHint":
-    "先用 scripts/wechatbot-bridge.mjs 扫码登录微信，再把桥接地址填到这里",
+    "先用 scripts/wechatbot-bridge.mjs 扫码登录微信，再把桥接地址填到这里；签名密钥填桥接服务的 WECHATBOT_TOKEN",
 
   // ---------- AI 在工作台 / 访客端 ----------
   "workbench.aiSuggest": "AI 建议",
@@ -855,6 +857,8 @@ export const en: Record<MessageKey, string> = {
   "common.operationFailed": "Something went wrong, please retry",
   "common.deleteConfirm": "This cannot be undone. Delete anyway?",
   "common.searchPlaceholder": "Search…",
+  "common.secretKept": "Saved. Leave blank to keep it",
+  "common.secretClear": "Remove the saved secret",
 
   // ---------- auth ----------
   "auth.title": "Sign in to BeeSupport",
@@ -1454,7 +1458,7 @@ export const en: Record<MessageKey, string> = {
   "webhooks.wechatGoLogin": "Sign in with QR",
   "webhooks.urlHintWechatBot": "http://127.0.0.1:8787/send?to=<wxid or alias>",
   "webhooks.wechatBridgeHint":
-    "Run scripts/wechatbot-bridge.mjs to sign in with QR, then paste the bridge URL here",
+    "Run scripts/wechatbot-bridge.mjs to sign in with QR, then paste the bridge URL here. Use the bridge's WECHATBOT_TOKEN as the signing secret",
 
   // ---------- AI in workbench / widget ----------
   "workbench.aiSuggest": "AI suggestion",

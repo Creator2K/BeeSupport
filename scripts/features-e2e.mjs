@@ -35,6 +35,20 @@ async function until(check, message = "condition", timeout = 8000) {
   }
   throw new Error(`Timeout: ${message}`);
 }
+// 绕过后台直接改库不会清掉应用里的风控规则缓存，要等它过期。
+// 和应用读同一个变量：留空或写错按默认 5 秒算
+const ruleCacheMs = Number(
+  process.env.RISK_RULE_CACHE_TTL_MS?.trim() || 5000,
+);
+const ruleCacheExpired = () =>
+  new Promise((resolve) =>
+    setTimeout(
+      resolve,
+      (Number.isFinite(ruleCacheMs) && ruleCacheMs >= 0
+        ? Math.min(ruleCacheMs, 60000)
+        : 5000) + 500,
+    ),
+  );
 async function test(name, fn) {
   try {
     await fn();
@@ -430,6 +444,7 @@ try {
       where: { id: word.id },
       data: { expiresAt: new Date(Date.now() - 1000) },
     });
+    await ruleCacheExpired();
     assert.equal(
       (
         await visitorContext.request.post(`${APP}/api/widget/conversation`, {

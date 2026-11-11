@@ -82,6 +82,8 @@ docker compose run --rm --no-deps -v /srv/beesupport-recovered:/restore ops \
 
 之后先在隔离环境将应用的 `DATABASE_URL` 和 `UPLOAD_DIR` 指向新库、新目录，用原版本启动并检查登录、历史消息、附件下载和实时收发。不要先在恢复库上运行新版本的自动迁移。Compose 的 app 默认启动命令包含迁移，因此必须选对镜像；覆盖 uploads 挂载时用目标 `/app/data/uploads` 的 bind mount，同时覆盖 app 的 `DATABASE_URL`。宿主机 systemd 则更新对应版本目录中的受限 `.env`，然后重新生成/核对服务单元。
 
+应用镜像以非 root 用户 `node`（UID/GID 1000）运行（Dockerfile 中有 `USER node` 的版本）。恢复工具创建的附件目录属于执行恢复的用户（`ops` 容器内为 root），权限 0700；挂给这类镜像的 app 之前，先在宿主机执行 `chown -R 1000:1000 <恢复出来的附件目录>`，否则应用读不到历史附件，也无法写入新文件。以 root 运行的旧镜像不需要这一步。
+
 ## 发布及回退顺序
 
 1. 在独立源码目录构建候选版本，运行 `pnpm check`、数据库回归和相关端到端验收。不要覆盖正在运行实例的 `.next`。保存候选 Git revision、镜像 ID、依赖锁文件及本次迁移清单；有未提交代码时先形成可追溯的发布提交/制品。

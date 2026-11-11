@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 
 import type { AgentStatus, Role } from "@prisma/client";
@@ -70,11 +70,18 @@ export async function createSession(
 ): Promise<void> {
   const token = await signSessionToken({ userId, role, tokenVersion });
   const store = await cookies();
+  // 可能是 "https,http" 这样的列表，第一段是离浏览器最近的那一跳
+  const requestProto = (await headers())
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    .trim()
+    .toLowerCase();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    // 按站点协议决定：内网 http 自部署（http://192.168.x.x）也必须能登录
-    secure: env.APP_URL.startsWith("https://"),
+    // 按站点协议决定：内网 http 自部署（http://192.168.x.x）也必须能登录。
+    // APP_URL 漏配成 http 但请求实际经 HTTPS 到达时同样加 Secure，避免 Cookie 走明文
+    secure: env.APP_URL.startsWith("https://") || requestProto === "https",
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   });
@@ -104,13 +111,7 @@ export async function resolveUserFromToken(
       where: { id: userId },
       include: {
         sites: { select: { siteId: true } },
-        tenant: {
-          select: {
-            status: true,
-            expiresAt: true,
-            sites: { select: { id: true } },
-          },
-        },
+        tenant: { select: { status: true, expiresAt: true } },
       },
     });
 
@@ -122,6 +123,16 @@ export async function resolveUserFromToken(
     }
 
     if (user.role !== "ADMIN" && user.tenant.status !== "ACTIVE") return null;
+    // 只有商户管理员的范围是「租户下全部站点」，其他角色用不到，不必每个请求都查一遍站点表
+    const tenantSiteIds =
+      user.role === "MERCHANT_ADMIN"
+        ? (
+            await prisma.site.findMany({
+              where: { tenantId: user.tenantId },
+              select: { id: true },
+            })
+          ).map((site) => site.id)
+        : [];
     return {
       tenantId: user.tenantId,
       tenantStatus: user.tenant.status,
@@ -138,7 +149,7 @@ export async function resolveUserFromToken(
         user.role === "ADMIN"
           ? null
           : user.role === "MERCHANT_ADMIN"
-            ? user.tenant.sites.map((s) => s.id)
+            ? tenantSiteIds
             : user.sites.map((s) => s.siteId),
     };
   } catch {

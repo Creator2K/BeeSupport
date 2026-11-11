@@ -28,6 +28,7 @@ import type { AiFormState, AiFormUpdater } from "./ai-types";
 
 export function AiConnectionConfigCard({
   form,
+  apiKeySet,
   modelOptions,
   loadingModels,
   onUpdate,
@@ -35,6 +36,7 @@ export function AiConnectionConfigCard({
   onLoadModels,
 }: {
   form: AiFormState;
+  apiKeySet: boolean;
   modelOptions: string[];
   loadingModels: boolean;
   onUpdate: AiFormUpdater;
@@ -76,8 +78,9 @@ export function AiConnectionConfigCard({
               <Input
                 id="ai-key"
                 type="password"
+                autoComplete="new-password"
                 value={form.apiKey}
-                placeholder="sk-..."
+                placeholder={apiKeySet ? t("common.secretKept") : "sk-..."}
                 onChange={(event) => onUpdate("apiKey", event.target.value)}
               />
             </div>

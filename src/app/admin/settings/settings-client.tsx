@@ -39,11 +39,13 @@ export type SmtpFormState = {
 export function SettingsClient({
   user,
   smtp,
+  smtpPassSet,
   accountPolicy,
   smtpReady,
 }: {
   user: { name: string; email: string; locale: string };
   smtp: SmtpFormState | null;
+  smtpPassSet: boolean;
   accountPolicy: { requireEmailVerification: boolean };
   smtpReady: boolean;
 }) {
@@ -159,6 +161,10 @@ export function SettingsClient({
                 <Input
                   id="smtp-pass"
                   type="password"
+                  autoComplete="new-password"
+                  placeholder={
+                    smtpPassSet ? t("common.secretKept") : undefined
+                  }
                   value={smtpForm.pass}
                   onChange={(event) => updateSmtp("pass", event.target.value)}
                 />

@@ -70,7 +70,7 @@ export default async function RiskPage({
     <div className="min-w-0">
       <PageHeader
         title="风控管理"
-        description="管理违禁词、IP 封禁和访客访问风险。规则修改后立即用于新请求。"
+        description="管理违禁词、IP 封禁和访客访问风险。规则修改后立即用于新请求；多实例部署时，其他实例默认最多晚 5 秒。"
       />
       <RiskClient
         basePath={`${ADMIN_PATH}/risk`}

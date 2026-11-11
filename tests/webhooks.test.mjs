@@ -289,6 +289,126 @@ test("malformed success acknowledgements are rejected and custom signatures stil
   );
 });
 
+test("custom webhooks add a timestamped signature that also covers the delivery id", async () => {
+  const hooks = fixture();
+  const seen = [];
+  const savedNow = Date.now;
+  Date.now = () => 1_700_000_000_999;
+  try {
+    await withFetch(
+      async (_url, options) => {
+        seen.push(options);
+        return new Response(null, { status: 204 });
+      },
+      async () => {
+        const url = "https://hook.example";
+        await hooks.sendToEndpoint("GENERIC", url, "test-secret", payload, "job-1");
+        await hooks.sendToEndpoint("GENERIC", url, "test-secret", payload);
+        await hooks.sendToEndpoint("GENERIC", url, null, payload, "job-2");
+      },
+    );
+  } finally {
+    Date.now = savedNow;
+  }
+  const sign = (content) =>
+    createHmac("sha256", "test-secret").update(content).digest("hex");
+  const [queued, manual, unsigned] = seen;
+
+  assert.equal(queued.headers["x-beesupport-timestamp"], "1700000000");
+  assert.equal(queued.headers["x-beesupport-delivery-id"], "job-1");
+  assert.equal(
+    queued.headers["x-beesupport-signature-v2"],
+    sign(`1700000000.job-1.${queued.body}`),
+  );
+  // The body-only signature that existing receivers verify stays as it was.
+  assert.equal(queued.headers["x-beesupport-signature"], sign(queued.body));
+
+  // A manual test push has no delivery id: that part of the signed text is empty.
+  assert.equal(manual.headers["x-beesupport-delivery-id"], undefined);
+  assert.equal(
+    manual.headers["x-beesupport-signature-v2"],
+    sign(`1700000000..${manual.body}`),
+  );
+  assert.notEqual(
+    manual.headers["x-beesupport-signature-v2"],
+    queued.headers["x-beesupport-signature-v2"],
+  );
+
+  // Without a secret nothing is signed.
+  for (const name of [
+    "x-beesupport-signature",
+    "x-beesupport-signature-v2",
+    "x-beesupport-timestamp",
+  ])
+    assert.equal(unsigned.headers[name], undefined);
+  assert.equal(unsigned.headers["x-beesupport-delivery-id"], "job-2");
+});
+
+test("DingTalk and WeCom markdown shows visitor text literally instead of parsing it", async () => {
+  const hooks = fixture();
+  const systemLink = "[打开会话](https://support.example/agent?c=c1)";
+  const hostile = {
+    ...payload,
+    title: "【新消息】Shop [x](https://evil.example)",
+    text: [
+      "访客：Eve <eve@example.com>",
+      "内容：[打开会话](https://evil.example/login) ![](https://evil.example/p.png)",
+      '<@all> <font color="warning">系统通知</font>',
+      "# 假标题",
+      "  > 假引用 a_b@example.com #1 2*3",
+    ].join("\n"),
+    url: "https://support.example/agent?c=c1",
+  };
+  for (const type of ["DINGTALK", "WECHAT_WORK"]) {
+    let sent;
+    await withFetch(
+      async (_url, options) => {
+        sent = JSON.parse(options.body);
+        return Response.json({ errcode: 0 });
+      },
+      async () => {
+        const result = await hooks.sendToEndpoint(
+          type,
+          "https://hook.example",
+          null,
+          hostile,
+        );
+        assert.equal(result.ok, true);
+      },
+    );
+    const text =
+      type === "DINGTALK" ? sent.markdown.text : sent.markdown.content;
+    const lines = text.split("\n");
+
+    // The only link left is the one the system adds itself.
+    assert.deepEqual(text.match(/\[[^\]]*\]\([^)]*\)/g), [systemLink]);
+    assert.equal(lines.at(-1), systemLink);
+    // No bracket, tag, mention, heading or quote from the visitor survives ...
+    assert.doesNotMatch(lines.slice(0, -1).join("\n"), /[[\]<>]/);
+    assert.doesNotMatch(text, /^\s*[#>]/m);
+    // ... while the words stay readable and ordinary characters are untouched.
+    assert.equal(lines[0], "**【新消息】Shop ［x］(https://evil.example)**");
+    assert.equal(lines[1], "访客：Eve ＜eve@example.com＞");
+    assert.equal(lines[4], "＃ 假标题");
+    assert.equal(lines[5], "  ＞ 假引用 a_b@example.com #1 2*3");
+    // DingTalk shows this field as plain text in the chat list.
+    if (type === "DINGTALK") assert.equal(sent.markdown.title, hostile.title);
+  }
+
+  // Channels that send plain text are not parsed, so they keep the original characters.
+  let plain;
+  await withFetch(
+    async (_url, options) => {
+      plain = JSON.parse(options.body);
+      return Response.json({ ok: true });
+    },
+    async () =>
+      hooks.sendToEndpoint("TELEGRAM", "https://hook.example", null, hostile),
+  );
+  assert.ok(plain.text.includes("访客：Eve <eve@example.com>"));
+  assert.ok(plain.text.includes("# 假标题"));
+});
+
 test("an interrupted success response can retry while malformed JSON cannot", async () => {
   const hooks = fixture([endpoint("TELEGRAM")]);
   let calls = 0;

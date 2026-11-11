@@ -70,7 +70,8 @@ export default async function AiPage() {
     <div>
       <PageHeader title={t("ai.title")} description={t("ai.subtitle")} />
       <AiClient
-        config={config}
+        config={{ ...config, apiKey: "" }}
+        apiKeySet={Boolean(config.apiKey)}
         entries={entries}
         sites={sites}
         indexStats={indexStats}

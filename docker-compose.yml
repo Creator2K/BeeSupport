@@ -4,7 +4,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-beesupport}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beesupport}
+      # 没有默认密码：已有数据卷时填原来的密码（该变量只在首次建库时生效）
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-beesupport}
       TZ: Asia/Shanghai
     # 默认映射到 55432，避免与宿主机已有 PostgreSQL 冲突
@@ -67,10 +68,17 @@ services:
       REPORT_TIMEZONE: ${REPORT_TIMEZONE:-Asia/Shanghai}
       AUTH_SECRET: ${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}
       ADMIN_PATH: ${ADMIN_PATH:-/admin}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-beesupport}:${POSTGRES_PASSWORD:-beesupport}@postgres:5432/${POSTGRES_DB:-beesupport}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-beesupport}:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-beesupport}?schema=public
       REDIS_URL: redis://redis:6379
       UPLOAD_DIR: /app/data/uploads
       UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-20971520}
+      UPLOAD_MAX_CONCURRENT: ${UPLOAD_MAX_CONCURRENT:-4}
+      # 数据保留天数，留空表示不清理
+      RISK_EVENT_RETENTION_DAYS: ${RISK_EVENT_RETENTION_DAYS:-}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-}
+      ANONYMOUS_VISITOR_RETENTION_DAYS: ${ANONYMOUS_VISITOR_RETENTION_DAYS:-}
+      # 风控规则列表的缓存时间（毫秒），留空为默认 5000，0 为不缓存
+      RISK_RULE_CACHE_TTL_MS: ${RISK_RULE_CACHE_TTL_MS:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_SECURE: ${SMTP_SECURE:-}
@@ -85,8 +93,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-}
+    # 默认只绑定本机，供同机反向代理访问；需要用服务器 IP 直接访问时设 APP_BIND_ADDRESS=0.0.0.0
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
     volumes:
       - uploads:/app/data/uploads
     healthcheck:

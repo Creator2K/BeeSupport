@@ -33,6 +33,7 @@ export function useWebhookForm({
   const [type, setType] = useState<WebhookRecord["type"]>("GENERIC");
   const [url, setUrl] = useState("");
   const [secret, setSecret] = useState("");
+  const [clearSecret, setClearSecret] = useState(false);
   const [events, setEvents] = useState<string[]>([]);
   const [siteId, setSiteId] = useState("__all__");
   const [active, setActive] = useState(true);
@@ -45,7 +46,8 @@ export function useWebhookForm({
     setName(endpoint?.name ?? "");
     setType(endpoint?.type ?? "GENERIC");
     setUrl(endpoint?.url ?? "");
-    setSecret(endpoint?.secret ?? "");
+    setSecret("");
+    setClearSecret(false);
     setEvents(endpoint?.events ?? []);
     setSiteId(endpoint?.siteId ?? "__all__");
     setActive(endpoint?.active ?? true);
@@ -77,6 +79,7 @@ export function useWebhookForm({
       type,
       url,
       secret: secret || null,
+      clearSecret,
       events,
       siteId: siteId === "__all__" ? null : siteId,
       active,
@@ -112,6 +115,9 @@ export function useWebhookForm({
     setUrl,
     secret,
     setSecret,
+    secretKept: Boolean(endpoint?.secretSet) && endpoint?.type === type,
+    clearSecret,
+    setClearSecret,
     events,
     toggleEvent,
     siteId,

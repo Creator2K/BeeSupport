@@ -22,7 +22,7 @@ export function RiskEventsTable({
     <section className="min-w-0 rounded-xl border bg-card p-4 sm:p-5">
       <h2 className="font-medium">拦截记录</h2>
       <p className="mb-4 text-xs text-muted-foreground">
-        记录命中的规则和访问 IP，不保存被拦截的完整消息内容。
+        记录命中的规则和访问 IP，不保存被拦截的完整消息内容。同一来源重复触发同一条规则时，十分钟内只记一条。
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-xs">

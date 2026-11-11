@@ -106,15 +106,16 @@
 前置：Node 20+、pnpm、Docker（只为起 Postgres/Redis）。
 
 ```bash
-# 1) 起数据库与 Redis（宿主机端口 55432 / 56379，避免与本地已有服务冲突）
+# 1) 配置环境变量（复制后按需修改，AUTH_SECRET 必填）
+#    docker compose 也读这个文件：缺 AUTH_SECRET 或 POSTGRES_PASSWORD 时任何 compose 命令都会报错
+cp .env.example .env          # Windows: copy .env.example .env
+
+# 2) 起数据库与 Redis（宿主机端口 55432 / 56379，避免与本地已有服务冲突）
 docker compose up -d postgres redis
 
-# 2) 安装依赖并生成 Prisma Client
+# 3) 安装依赖并生成 Prisma Client
 pnpm install
 pnpm db:generate
-
-# 3) 配置环境变量（复制后按需修改，AUTH_SECRET 必填）
-cp .env.example .env          # Windows: copy .env.example .env
 
 # 4) 建表 + 初始化演示数据
 pnpm prisma migrate deploy
@@ -153,18 +154,47 @@ cp .env.example .env
 #   至少改这几项：
 #   AUTH_SECRET="$(openssl rand -base64 48)"
 #   APP_URL="https://support.example.com"
-#   POSTGRES_PASSWORD="强密码"
+#   POSTGRES_PASSWORD="强密码"      # 必填，compose 不提供默认密码；只用字母数字，或自行做 URL 编码
 
 # 2) 构建并启动（app + postgres + redis）
 docker compose up -d --build
 
 # 3) 首次初始化演示账号（可选；也可以直接进后台建客服）
-docker compose exec app npx tsx prisma/seed.ts
+#    生产环境拒绝默认演示密码，两个密码都要自己指定
+docker compose exec \
+  -e SEED_ADMIN_PASSWORD='换成管理员密码' \
+  -e SEED_AGENT_PASSWORD='换成客服密码' \
+  app npx tsx prisma/seed.ts
 ```
 
-访问 `http://<服务器>:3000`；上生产建议前面挂 Nginx/Caddy 做 HTTPS 反代，并把
-`APP_URL` 改成 https 域名（会话 cookie 的 `secure` 属性依据 `APP_URL` 协议自动决定，
-因此内网 http 部署同样可以正常登录）。
+应用端口默认只绑定服务器本机（`127.0.0.1:3000`），供同机的 Nginx/Caddy 反向代理访问。要直接用
+`http://<服务器>:3000` 访问（例如内网部署），在 `.env` 里设 `APP_BIND_ADDRESS=0.0.0.0`；宿主机端口用
+`APP_PORT` 修改。
+
+上生产建议前面挂 Nginx/Caddy 做 HTTPS 反代，并把 `APP_URL` 改成 https 域名。会话 cookie 在
+`APP_URL` 是 https、或请求经 HTTPS 到达（反代传来 `X-Forwarded-Proto: https`）时带 `secure`
+属性，因此内网 http 部署同样可以正常登录。生产环境 `APP_URL` 不是 https、或数据库仍在用仓库公开的
+示例密码时，启动日志会各打一条 `config.*` 警告，不阻止启动。
+
+### 容器用户与升级
+
+应用容器以非 root 用户 `node`（UID/GID 1000）运行：代码和依赖对它只读，`/app` 下可写的只有上传目录和
+`.next`。全新部署不需要额外操作。
+从以 root 运行的旧镜像升级时做两件事：
+
+1. 在 `.env` 里补上 `POSTGRES_PASSWORD`，值为数据库现有的密码（以前没设过，就是旧版 compose 的默认值，与
+   `.env.example` 中 `DATABASE_URL` 里的密码相同）。这个变量只在首次建库时生效，填别的值不会修改已有
+   数据库的密码，只会让应用连不上。
+2. 已有的 `uploads` 卷属主是 root，升级时改一次属主，否则上传文件和微信登录凭证的写入会失败：
+
+```bash
+docker compose build app
+docker compose stop app
+docker compose run --rm --no-deps --user root --entrypoint chown app -R node:node /app/data/uploads
+docker compose up -d
+```
+
+把宿主机目录或恢复出来的附件目录挂到 `/app/data/uploads` 时同理，先执行 `chown -R 1000:1000 <目录>`。
 
 ### 反向代理注意
 
@@ -285,6 +315,17 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
 3 次，永久错误会直接记录失败。每次事件最多并发投递 4 个渠道，解析渠道响应时设置 16 KiB 上限。
 邮件与 Webhook 通过持久化 NotificationJob outbox 独立调度；worker 使用数据库租约和 SKIP LOCKED，支持多实例消费、重试与失败记录。
 
+自定义 Webhook 填了签名密钥时，请求带 `x-beesupport-timestamp`（发送时刻，Unix 秒）和
+`x-beesupport-signature-v2`：用密钥对 `时间戳.投递编号.请求体原文` 计算 HMAC-SHA256，取十六进制。
+投递编号就是 `x-beesupport-delivery-id` 的值；没有这个请求头时（后台「测试推送」）按空字符串算，
+即 `时间戳..请求体原文`。接收方校验这个签名、拒绝时间戳与本机时间相差超过 5 分钟的请求、再按投递编号去重，
+被截获的请求就不能拿来重放。原有的 `x-beesupport-signature`（只对请求体原文签名）照常发送，
+已接入的接收方不用改；它不含时间戳，挡不住重放。
+
+钉钉 / 企业微信的 Markdown 没有转义写法，所以这两个渠道的通知会把标题和正文里的方括号、尖括号
+和行首的 `#` 换成全角字符：访客写的内容只当文字显示，不会变成链接、图片、@ 群成员或标题。
+加粗、斜体、行内代码只影响那段文字自己的样式，不处理。其他渠道发的是纯文本，内容不变。
+
 ### 微信通知
 
 1. 打开 `/admin/webhooks`（通知渠道），最上面的 **微信扫码登录** 面板点「生成二维码并登录」；
@@ -298,6 +339,8 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
 > 想用独立进程/独立机器跑微信（例如把微信放在另一台电脑上），可以继续用
 > `pnpm wechat:bridge` 起一个外部桥接服务，然后在数据库/接口里把渠道类型设为
 > `WECHAT`（界面上不再提供这个选项，保留给历史数据与高级用法）。
+> 桥接服务必须设置 `WECHATBOT_TOKEN`（没有就拒绝启动），并把同一个值填进该渠道的「签名密钥」；它默认只监听
+> `127.0.0.1`，应用跑在另一台机器或容器里时用 `WECHATBOT_HOST` 改成对应网卡地址，单个请求体上限 256 KB。
 > 两种方式都是单向发送：只把通知推给你，不处理微信里收到的消息。
 
 ---
@@ -309,19 +352,26 @@ Webhook 会校验渠道返回的业务结果：Telegram / 微信桥接检查 `ok
 | `DATABASE_URL`                                  | ✅   | PostgreSQL 连接串                                                              |
 | `AUTH_SECRET`                                   | ✅   | JWT 签名密钥，`openssl rand -base64 48`                                        |
 | `APP_URL`                                       | ✅   | 对外访问地址，用于嵌入代码与邮件链接；https 时 cookie 自动加 `secure`          |
+| `POSTGRES_PASSWORD`                             | ➖   | 仅 Docker Compose：数据库密码，用 Compose 时必填，没有默认值                     |
+| `APP_BIND_ADDRESS` / `APP_PORT`                 | ➖   | 仅 Docker Compose：应用端口绑定的宿主机地址和端口，默认 `127.0.0.1` 和 `3000`       |
 | `ADMIN_PATH`                                    | ➖   | 管理后台入口路径，默认 `/admin`；建议改随机串，如 `/console-82553547`          |
 | `REDIS_URL`                                     | ➖   | 配置后启用跨实例广播与 Redis 限流；不配置则单实例内存实现                      |
 | `SOCKET_IDENTITY_TTL_MS` | ➖ | 身份复核间隔，默认 5000毫秒，上限 60000 |
 | `SOCKET_CONVERSATION_TTL_MS` | ➖ | 会话访问缓存间隔，默认 5000毫秒，上限 60000 |
+| `RISK_RULE_CACHE_TTL_MS` | ➖ | 风控规则列表的缓存时间，默认 5000 毫秒，上限 60000；设为 0 关闭缓存，每个访客请求都查库 |
 | `PORT`                                          | ➖   | 监听端口，默认 3000                                                            |
 | `UPLOAD_DIR`                                    | ➖   | 上传目录，默认 `./data/uploads`，容器内 `/app/data/uploads`                    |
 | `UPLOAD_MAX_BYTES`                              | ➖   | 单文件上限，默认 20MB                                                          |
+| `UPLOAD_MAX_CONCURRENT`                         | ➖   | 同时处理的上传数，默认 4；同一来源最多占一半，满了排队 10 秒后提示稍后再试    |
+| `RISK_EVENT_RETENTION_DAYS`                     | ➖   | 拦截记录保留天数；默认 0（不清理），见「数据保留」                           |
+| `AUDIT_LOG_RETENTION_DAYS`                      | ➖   | 操作审计保留天数；默认 0（不清理）                                             |
+| `ANONYMOUS_VISITOR_RETENTION_DAYS`              | ➖   | 只浏览过、没有会话和资料的访客保留天数；默认 0（不清理）                       |
 | `SMTP_HOST/PORT/SECURE/USER/PASS/FROM`          | ➖   | 邮件通知；后台「系统设置」里的配置优先级更高                                   |
 | `OPENAI_BASE_URL/API_KEY/MODEL/EMBEDDING_MODEL` | ➖   | AI 的首次默认值；后台「AI 助手」里的配置优先级更高                             |
 | `WECHATBOT_ENABLED`                             | ➖   | 置 `true` 则服务启动时自动登录微信（等价于后台那个开关）                       |
 | `WECHATBOT_STORAGE_DIR`                         | ➖   | 微信登录凭证目录，默认 `${UPLOAD_DIR}/wechatbot`；Docker 里已挂在 `uploads` 卷 |
 | `WECHATBOT_DEFAULT_TO`                          | ➖   | 微信默认接收人（wxid 或备注名）                                                |
-| `WECHATBOT_PORT/TOKEN`                          | ➖   | 外部桥接服务（`pnpm wechat:bridge`）的参数                                     |
+| `WECHATBOT_PORT/HOST/TOKEN`                     | ➖   | 外部桥接服务（`pnpm wechat:bridge`）的参数；`TOKEN` 对桥接服务必填，默认只监听本机 |
 
 ---
 
@@ -497,9 +547,20 @@ AI 回复、索引结果与各自任务的完成状态一起提交；转人工�
 升级已有数据库时，先运行 `pnpm db:generate` 和 `pnpm db:deploy`，再构建并启动应用。
 新增迁移会为消息重试键添加唯一约束，并添加 AI 自动回复任务租约；历史重复消息会保留，
 仅清除重复的重试键，不删除聊天内容。
+迁移 `z25_lookup_indexes` 为消息作者、审计操作人和「商家 + 时间」的审计查询添加索引，不改数据；
+消息表和审计表很大时，建索引期间这两张表的写入会等待，建议在低峰期升级。
 
 `pnpm uploads:cleanup` 默认只预览；确认后使用 `pnpm uploads:cleanup --apply` 清理。
 清理只处理超过 24 小时的未发送附件和可识别的孤儿上传文件，会跳过微信凭据目录。
+应用运行期间每小时自动删除超过 24 小时的未发送附件（记录和文件），这部分不再占用商家存储配额；
+孤儿文件仍需手动运行上面的命令。访客上传另有三道限制：每位访客最多保留 10 个未发送附件，
+每个 IP 每小时最多上传 200 MB、每天 500 MB；每个 IP 每小时最多新建 60 个会话、每天 240 个。
+
+数据保留：拦截记录、操作审计和访客记录默认永不删除。设置 `RISK_EVENT_RETENTION_DAYS`、
+`AUDIT_LOG_RETENTION_DAYS`、`ANONYMOUS_VISITOR_RETENTION_DAYS`（天数）后，应用每小时删除早于该天数的数据，
+每张表每次最多删 2 万行，积压分多次删完；删除不可恢复，启用前先备份。审计删除后，审计报表和导出里不再有
+更早的记录。访客只删「只浏览过」的：没有会话、没有邮箱和称呼、没有被拉黑、没有标签和备注，并且超过该天数没有
+再来；删除后访客分析里的累计访客数、访问量和设备、来源分布会相应减少，天数小于 90 时趋势图里较早的日期也会变少。
 PostgreSQL 和 Redis 的宿主机端口默认仅绑定 `127.0.0.1`，应用容器通过内部网络访问。
 
 后台概览的会话总数、满意度和平均首响覆盖最近 7 × 24 小时的全部会话，不再抽样 200 条。
@@ -599,12 +660,29 @@ AI 消息的 `meta` 里，点开「工具 / 知识库」小标签就能看到。
 
 应用默认监听 `BIND_HOST=0.0.0.0`，不使用操作系统或 Docker 自动设置的 `HOSTNAME`。
 局域网使用时将 `APP_URL` 设为实际访问地址（例如 `http://192.168.1.168:3000`）。
+用 Docker Compose 部署时，宿主机端口默认只绑定 `127.0.0.1`，局域网其他机器要直接访问还需在 `.env` 里设
+`APP_BIND_ADDRESS=0.0.0.0`。
 复制按钮兼容普通 HTTP；浏览器拒绝自动复制时会显示可手动选择的文本。
 
 IP 限流和访客资料使用自定义 server 根据连接地址生成的 IP。默认忽略客户端提供的转发 IP。
 在反向代理后部署时，设置 `TRUSTED_PROXY_CIDRS` 为实际代理的 IP 或网段，例如本机代理使用
 `127.0.0.1/32,::1/128`。代理应追加或覆盖 `X-Forwarded-For`；应用从右向左跳过可信代理，
 取第一个非可信地址。仅配置代理实际使用的地址。业务入口必须通过 `server.ts`，不要使用裸 `next start`。
+
+访客接口另有总量保护，超出返回 429：带访客令牌的接口合计每个来源地址每 5 分钟 12000 次、每个访客 1200 次，
+`/api/widget/config` 每个来源地址每 5 分钟 600 次（IPv6 按 /64 归并）。实时连接里，加入会话每个身份 10 秒 30 次、
+切换在线状态 10 秒 10 次。这些上限约为正常用量的十倍。代理后面没有配置 `TRUSTED_PROXY_CIDRS` 时，
+所有访客会被算成同一个地址，按地址的上限会被一起用完。
+
+实时连接（Socket.IO）只接受本站来源：页面来源必须等于 `APP_URL`，或与请求的 `Host` 一致。
+反向代理改写了 `Host`（例如 Nginx 没有配置 `proxy_set_header Host $host`）时，`APP_URL` 必须是
+访客和客服实际访问的地址；同时使用多个域名时，把其余来源写进 `SOCKET_ALLOWED_ORIGINS`（逗号分隔）。
+被拒绝的握手会记一条 `realtime.origin_rejected` 日志。
+
+所有页面和接口响应都带 `X-Content-Type-Options: nosniff` 和 `Referrer-Policy`。除访客窗口 `/widget` 外，
+页面只允许被本站自己用 iframe 嵌入（`X-Frame-Options: SAMEORIGIN` 与 `frame-ancestors 'self'`），
+因此不能把后台或工作台嵌进其他域名的页面。`APP_URL` 为 `https://` 时还会发送
+`Strict-Transport-Security`（180 天，不含子域）。
 
 ## Linux 后台服务
 
@@ -660,7 +738,8 @@ Webhook 携带稳定的 `x-beesupport-delivery-id`，接收方可据此去重；
 后台「风控管理」支持全局或单站点规则：违禁词、IPv4/IPv6 地址及 CIDR 网段，可设置到期时间、批量添加、编辑、停用和删除。
 违禁词采用字面包含匹配，忽略大小写、全半角、空白和常见隐形字符，检查访客身份文本、消息、主题、评价及上传文件名；不对图片内容进行 OCR。
 IP 规则使用服务端确认的当前连接地址，覆盖新会话、已有访客请求和实时连接，不限制客服和管理员登录。
-启用封禁时会断开匹配的现有实时连接。拦截记录保存时间、命中规则、IP 与访客关联，不保存被拒消息的全文；规则变更和画像维护同时写入操作审计。
+启用封禁时会断开匹配的现有实时连接。拦截记录保存时间、命中规则、IP 与访客关联，不保存被拒消息的全文；规则变更和画像维护同时写入操作审计。同一站点上同一条规则对同一来源、同一访客、同一场景的重复拦截，十分钟内只记一条，每个站点每类规则十分钟最多记 300 条；拦截本身不受影响，「近 24 小时拦截」和访客的「拦截次数」统计的是记录条数。
+每个站点的规则列表在进程内缓存 5 秒（`RISK_RULE_CACHE_TTL_MS`，设为 0 关闭）：在后台改规则会立即清掉本实例的缓存，单实例部署下修改仍然立即生效；配置 `REDIS_URL` 的多实例部署下其他实例上的访客 HTTP 请求，以及绕过后台直接改数据库的变化，最多晚这么久才按新规则判断。实时连接握手不读缓存，规则到期时间每次请求都重新比对。
 
 新增迁移为 `9_visitor_profiles_and_risk`。新功能的实际浏览器/API 回归使用独立测试服务，执行
 `TEST_DATABASE_URL=... TEST_APP_URL=... pnpm e2e:features`。
@@ -764,7 +843,7 @@ IP 规则使用服务端确认的当前连接地址，覆盖新会话、已有�
 
 套餐管理及平台商家设置支持「自定义底部品牌」「AI 自动回复与客服草稿」「整体访客画像统计」。新建界面默认不勾选，已有商家、套餐和历史订单的空授权文档保持原有能力；明确设置的授权按开关执行。订单保存报价时的授权快照，编辑套餐不会改变旧订单，人工确认后更新商家授权。禁用底部品牌自定义时，实际公开配置强制使用平台品牌（平台留空时回退 BeeSupport）；保存的旧配置保留，重新授权后恢复。AI 生成及整体画像统计在服务端验证权限，日常接待、访客明细及基础概览仍可使用。此版未增加自动支付或 AI 按量收费。
 
-客服文本草稿按本机账号和会话保存在 localStorage，最多 50 段、每段 5000 字，7 天后失效；刷新可恢复，发送或主动清空后移除，发送失败返回时恢复，主动退出时清除该账号草稿。浏览器阻止存储时仍可聊天。草稿不上传服务器。登录使用每 IP 每 10 分钟 200 次的总请求限制，同时按 IP 50 次、账号 10 次失败进行保护；成功登录不增加失败计数，并清除该账号此前的失败次数，IP 失败计数不会被成功登录重置。达到失败上限后需等待限流窗口结束。
+客服文本草稿按本机账号和会话保存在 localStorage，最多 50 段、每段 5000 字，7 天后失效；刷新可恢复，发送或主动清空后移除，发送失败返回时恢复，主动退出时清除该账号草稿。浏览器阻止存储时仍可聊天。草稿不上传服务器。登录使用每 IP 每 10 分钟 200 次的总请求限制，同时按 IP 50 次、「账号 + IP」10 次、账号合计 100 次失败进行保护（IPv6 按 /64 归并计数）：别人在其他地址输错密码不会锁住账号主人，只有失败分散在十个以上地址并累计到 100 次时账号才会暂时无法登录。成功登录不增加失败计数，并清除该账号在当前 IP 上此前的失败次数，IP 失败计数和账号合计不会被成功登录重置。达到失败上限后需等待限流窗口结束。账号不存在、密码错误和账号停用返回同一句提示，只有密码正确时才会提示账号已被禁用。
 
 平台「平台运营看板」支持近 7/30/90 天的入驻、服务状态、待核对订单、人工确认订单金额、复购商家占比、接入情况和临近到期列表。日期按北京时间计算，排除系统默认商家；确认金额使用确认时订单快照及确认时间，未确认订单不计入，不代表支付渠道流水。复购指本期有确认订单且累计至少两笔已确认订单的商家。接入指标是曾检测到真实嵌入，不代表当前宿主网站在线；近 7 天无咨询活动按会话更新时间判断，含尚未接入者。统计以数据库一致性快照读取，不从分页样本估算。
 

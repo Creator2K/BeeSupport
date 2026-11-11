@@ -27,6 +27,7 @@ const webhookInputSchema = z
     // WECHAT_BOT 填的是微信接收人（wxid / 备注名，留空表示用默认接收人），其余类型必须是 URL
     url: z.string().trim().max(1000),
     secret: z.string().trim().max(200).optional().nullable(),
+    clearSecret: z.boolean().optional(),
     events: z.array(z.string().max(60)).max(20).default([]),
     siteId: z.string().optional().nullable(),
     active: z.boolean().default(true),
@@ -65,6 +66,20 @@ const webhookInputSchema = z
   });
 
 export type WebhookInput = z.input<typeof webhookInputSchema>;
+
+/**
+ * 密钥不下发给浏览器，编辑时留空表示沿用已保存的值。只在渠道类型不变时沿用；
+ * WECHAT 的密钥会作为 Bearer 发给推送地址，地址变了必须重新填写。
+ */
+function keptSecret(
+  stored: { type: string; url: string; secret: string | null },
+  next: { type: string; url: string },
+): string | null {
+  if (!stored.secret || stored.type !== next.type) return null;
+  if (next.type === "WECHAT" && stored.url !== next.url)
+    throw new HttpError(400, "修改推送地址后需要重新填写密钥");
+  return stored.secret;
+}
 
 export async function createWebhookAction(
   input: WebhookInput,
@@ -128,7 +143,13 @@ export async function updateWebhookAction(
 
     const existing = await prisma.webhookEndpoint.findUnique({
       where: { id },
-      select: { id: true, tenantId: true },
+      select: {
+        id: true,
+        tenantId: true,
+        type: true,
+        url: true,
+        secret: true,
+      },
     });
     if (!existing) throw new HttpError(404, "渠道不存在");
     const tenantId = await resourceTenantId(
@@ -136,6 +157,8 @@ export async function updateWebhookAction(
       data.siteId,
       existing.tenantId,
     );
+    const secret =
+      data.secret || (data.clearSecret ? null : keptSecret(existing, data));
 
     await prisma.webhookEndpoint.update({
       where: { id },
@@ -144,7 +167,7 @@ export async function updateWebhookAction(
         name: data.name,
         type: data.type,
         url: data.url,
-        secret: data.secret || null,
+        secret,
         events: data.events,
         siteId: data.siteId || null,
         active: data.active,
@@ -211,6 +234,7 @@ export async function toggleWebhookAction(
 
 /** 发送一条测试消息，验证渠道配置是否正确 */
 export async function testWebhookAction(input: {
+  id?: string;
   type: (typeof WEBHOOK_TYPES)[number];
   url: string;
   secret?: string | null;
@@ -221,6 +245,7 @@ export async function testWebhookAction(input: {
     const prisma = await adminDb();
     const parsed = z
       .object({
+        id: z.string().max(64).optional(),
         type: z.enum(WEBHOOK_TYPES),
         url: z.string().trim().min(1, "请填写推送地址").max(1000),
         secret: z.string().trim().max(200).optional().nullable(),
@@ -255,10 +280,21 @@ export async function testWebhookAction(input: {
 
     if (!site) throw new HttpError(400, "请先创建至少一个站点");
 
+    let secret = parsed.secret || null;
+    if (!secret && parsed.id) {
+      const stored = await prisma.webhookEndpoint.findUnique({
+        where: { id: parsed.id },
+        select: { type: true, url: true, secret: true },
+      });
+      // 已保存的密钥只用于它所属的渠道类型和地址
+      if (stored && stored.type === parsed.type && stored.url === parsed.url)
+        secret = stored.secret;
+    }
+
     const result = await testWebhook(
       parsed.type,
       parsed.url,
-      parsed.secret || null,
+      secret,
       site.id,
       site.name,
       admin.role !== "ADMIN",

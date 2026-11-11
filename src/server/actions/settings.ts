@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requirePlatformAdmin } from "@/lib/auth";
+import { HttpError, requirePlatformAdmin } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { SMTP_SETTING_KEY, sendMail, verifySmtp } from "@/lib/mail";
@@ -19,11 +19,28 @@ const smtpSchema = z.object({
 });
 
 export type SmtpInput = z.input<typeof smtpSchema>;
+type SmtpData = z.output<typeof smtpSchema>;
+
+/**
+ * 密码不下发给浏览器，表单留空表示沿用已保存的值。只在服务器和账号都没变时沿用，
+ * 否则已保存的密码会被发给一台新填的服务器。
+ */
+async function withStoredSmtpPassword(data: SmtpData): Promise<SmtpData> {
+  if (data.pass || !data.user) return data;
+  const setting = await prisma.setting.findUnique({
+    where: { key: SMTP_SETTING_KEY },
+  });
+  const stored = (setting?.value ?? null) as Partial<SmtpData> | null;
+  if (!stored?.pass) return data;
+  if (stored.host !== data.host || stored.user !== data.user)
+    throw new HttpError(400, "修改 SMTP 服务器或账号后需要重新填写密码");
+  return { ...data, pass: stored.pass };
+}
 
 export async function saveSmtpAction(input: SmtpInput): Promise<ActionResult> {
   try {
     const admin = await requirePlatformAdmin();
-    const data = smtpSchema.parse(input);
+    const data = await withStoredSmtpPassword(smtpSchema.parse(input));
 
     await prisma.setting.upsert({
       where: { key: SMTP_SETTING_KEY },
@@ -53,7 +70,7 @@ export async function testSmtpAction(input?: SmtpInput): Promise<ActionResult> {
 
     // 传了参数就先落库再测试，方便「保存并测试」一个按钮搞定
     if (input) {
-      const data = smtpSchema.parse(input);
+      const data = await withStoredSmtpPassword(smtpSchema.parse(input));
       await prisma.setting.upsert({
         where: { key: SMTP_SETTING_KEY },
         create: { key: SMTP_SETTING_KEY, value: data },

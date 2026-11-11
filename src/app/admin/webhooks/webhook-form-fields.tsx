@@ -25,6 +25,8 @@ export function WebhookFormFields({
   type,
   url,
   secret,
+  secretKept,
+  clearSecret,
   events,
   siteId,
   active,
@@ -35,6 +37,7 @@ export function WebhookFormFields({
   setType,
   setUrl,
   setSecret,
+  setClearSecret,
   setSiteId,
   setActive,
   toggleEvent,
@@ -43,6 +46,8 @@ export function WebhookFormFields({
   type: WebhookRecord["type"];
   url: string;
   secret: string;
+  secretKept: boolean;
+  clearSecret: boolean;
   events: string[];
   siteId: string;
   active: boolean;
@@ -53,6 +58,7 @@ export function WebhookFormFields({
   setType: (value: WebhookRecord["type"]) => void;
   setUrl: (value: string) => void;
   setSecret: (value: string) => void;
+  setClearSecret: (value: boolean) => void;
   setSiteId: (value: string) => void;
   setActive: (value: boolean) => void;
   toggleEvent: (value: string) => void;
@@ -129,7 +135,7 @@ export function WebhookFormFields({
             ) : null}
           </div>
 
-          {type === "GENERIC" ? (
+          {type === "GENERIC" || type === "WECHAT" ? (
             <div className="space-y-2">
               <Label htmlFor="webhook-secret">
                 {t("webhooks.secretLabel")}
@@ -137,28 +143,28 @@ export function WebhookFormFields({
               <Input
                 id="webhook-secret"
                 value={secret}
+                autoComplete="off"
+                placeholder={
+                  secretKept
+                    ? t("common.secretKept")
+                    : type === "WECHAT"
+                      ? t("webhooks.secretHint")
+                      : undefined
+                }
                 onChange={(event) => setSecret(event.target.value)}
               />
               <p className="text-muted-foreground text-xs">
                 {t("webhooks.secretHint")}
               </p>
-            </div>
-          ) : null}
-
-          {type === "WECHAT" ? (
-            <div className="space-y-2">
-              <Label htmlFor="webhook-secret">
-                {t("webhooks.secretLabel")}
-              </Label>
-              <Input
-                id="webhook-secret"
-                value={secret}
-                placeholder={t("webhooks.secretHint")}
-                onChange={(event) => setSecret(event.target.value)}
-              />
-              <p className="text-muted-foreground text-xs">
-                {t("webhooks.secretHint")}
-              </p>
+              {secretKept ? (
+                <label className="flex cursor-pointer items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={clearSecret}
+                    onCheckedChange={(value) => setClearSecret(value === true)}
+                  />
+                  {t("common.secretClear")}
+                </label>
+              ) : null}
             </div>
           ) : null}
 

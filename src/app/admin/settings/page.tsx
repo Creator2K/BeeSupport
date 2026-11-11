@@ -33,6 +33,7 @@ export default async function SettingsPage() {
         accountPolicy={policy}
         smtpReady={Boolean(smtpConfig)}
         user={{ name: admin.name, email: admin.email, locale: admin.locale }}
+        smtpPassSet={Boolean(smtp?.host && smtp.pass)}
         smtp={
           smtp?.host
             ? {
@@ -40,7 +41,7 @@ export default async function SettingsPage() {
                 port: Number(smtp.port ?? 465),
                 secure: Boolean(smtp.secure),
                 user: smtp.user ?? "",
-                pass: smtp.pass ?? "",
+                pass: "",
                 from: smtp.from ?? "",
               }
             : null

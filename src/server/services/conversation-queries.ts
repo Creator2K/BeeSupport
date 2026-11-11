@@ -130,7 +130,13 @@ export async function listConversations(
   if (filters.onlyUnread) where.unreadForAgent = { gt: 0 };
   if (filters.tag) where.tags = { has: filters.tag };
 
-  const keyword = filters.query?.trim();
+  // 关键词要对范围内的每一行做模糊匹配，长度不设限的话一次请求就能拖慢数据库。
+  // 只取前 200 字：包含完整关键词的行也包含它的前 200 字，不会漏掉结果。
+  // 截断点落在代理对中间时丢掉前半个，否则关键词末尾会变成一个匹配不到的字符
+  const keyword = filters.query
+    ?.trim()
+    .slice(0, 200)
+    .replace(/[\uD800-\uDBFF]$/, "");
   if (keyword) {
     where.OR = [
       { visitor: { email: { contains: keyword, mode: "insensitive" } } },

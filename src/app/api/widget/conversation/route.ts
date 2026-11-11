@@ -118,6 +118,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     if (!dbVisitor) throw new HttpError(404, "访客不存在");
 
+    // The monthly conversation quota is shared by the whole tenant. Without a
+    // per-address cap, one client rotating visitor identities can use it up.
+    const active = await prisma.conversation.findFirst({
+      where: {
+        siteId: site.id,
+        visitorId: dbVisitor.id,
+        status: { in: ["PENDING", "OPEN"] },
+      },
+      select: { id: true },
+    });
+    if (!active) {
+      const ip = clientIp(request.headers);
+      const creation = await Promise.all([
+        rateLimit(`widget:conversation-new:${ip}`, 60, 3600),
+        rateLimit(`widget:conversation-new-day:${ip}`, 240, 86400),
+      ]);
+      if (creation.some((entry) => !entry.ok))
+        throw new HttpError(429, "当前网络发起的会话过多，请稍后再试");
+    }
+
     const { conversationId, created } = await createConversationForVisitor({
       site: {
         id: site.id,

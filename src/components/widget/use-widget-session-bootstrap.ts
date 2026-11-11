@@ -10,7 +10,7 @@ import type { VisitorConversation } from "@/lib/realtime/public";
 import type { SerializedMessage } from "@/lib/realtime/types";
 
 import type { StoredIdentity } from "./use-widget-tracking";
-import { fetchWidgetState } from "./widget-session-api";
+import { requestWidgetState } from "./widget-session-api";
 import type { WidgetChatMode } from "./use-widget-session-state";
 
 export function useWidgetSessionBootstrap({
@@ -81,7 +81,7 @@ export function useWidgetSessionBootstrap({
 
         const stored = readIdentity();
         if (stored?.token) {
-          const state = await fetchWidgetState(stored.token);
+          const { state, status } = await requestWidgetState(stored.token);
           if (cancelled) return;
           if (state) {
             setToken(stored.token);
@@ -95,7 +95,9 @@ export function useWidgetSessionBootstrap({
             setMode("chat");
             return;
           }
-          window.localStorage.removeItem(identityStorageKey);
+          // 只有服务端明确说令牌失效才清掉本地身份；限流或临时故障时留着，下次打开还能接着用
+          if (status === 401)
+            window.localStorage.removeItem(identityStorageKey);
         }
 
         if (stored?.email) setEmail(stored.email);

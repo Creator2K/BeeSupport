@@ -52,6 +52,93 @@ export function allowedMimeTypes(): string[] {
   return [...ALLOWED_MIME.keys()];
 }
 
+type UploadWaiter = {
+  key: string;
+  settle: (granted: boolean) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+/**
+ * 上传名额：一次上传在内存里要占文件大小的数倍（分块、拼接、FormData、落盘前的 Buffer），
+ * 所以同时处理的上传数有上限。满了先排队，等不到就让客户端稍后重试；
+ * 同一个来源最多占一半名额，免得一个慢速客户端把所有人的上传都堵住。
+ */
+export function createUploadGate(options: {
+  limit: number;
+  waitMs: number;
+  maxWaiting: number;
+}) {
+  const perKeyLimit = Math.max(1, Math.ceil(options.limit / 2));
+  const activeByKey = new Map<string, number>();
+  const waiting: UploadWaiter[] = [];
+  let active = 0;
+
+  const canStart = (key: string) =>
+    active < options.limit && (activeByKey.get(key) ?? 0) < perKeyLimit;
+  const start = (key: string) => {
+    active += 1;
+    activeByKey.set(key, (activeByKey.get(key) ?? 0) + 1);
+  };
+  const finish = (key: string) => {
+    active -= 1;
+    const left = (activeByKey.get(key) ?? 1) - 1;
+    if (left > 0) activeByKey.set(key, left);
+    else activeByKey.delete(key);
+    const next = waiting.find((waiter) => canStart(waiter.key));
+    if (!next) return;
+    waiting.splice(waiting.indexOf(next), 1);
+    clearTimeout(next.timer);
+    start(next.key);
+    next.settle(true);
+  };
+
+  return {
+    /** 占一个名额并返回释放函数；排不上（队列已满或等待超时）返回 null */
+    async acquire(key: string): Promise<(() => void) | null> {
+      if (canStart(key)) start(key);
+      else {
+        if (waiting.length >= options.maxWaiting) return null;
+        const granted = await new Promise<boolean>((resolve) => {
+          const waiter: UploadWaiter = {
+            key,
+            settle: resolve,
+            timer: setTimeout(() => {
+              waiting.splice(waiting.indexOf(waiter), 1);
+              resolve(false);
+            }, options.waitMs),
+          };
+          waiting.push(waiter);
+        });
+        if (!granted) return null;
+      }
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        finish(key);
+      };
+    },
+  };
+}
+
+// 自定义 server 和 Next 的路由打包会各自加载此模块，名额必须按进程计数。
+// 共用的只有计数：错误要在调用方这份模块里抛，toErrorResponse 才认得出它的 HttpError
+const globalForUploads = globalThis as unknown as {
+  __beeUploadGate?: ReturnType<typeof createUploadGate>;
+};
+const uploadGate = (globalForUploads.__beeUploadGate ??= createUploadGate({
+  limit: env.UPLOAD_MAX_CONCURRENT,
+  waitMs: 10_000,
+  maxWaiting: 32,
+}));
+
+/** 占一个上传名额并返回释放函数；要从读取请求体之前占到文件落盘之后 */
+export async function acquireUploadSlot(key: string): Promise<() => void> {
+  const release = await uploadGate.acquire(key);
+  if (!release) throw new HttpError(503, "当前上传较多，请稍后再试");
+  return release;
+}
+
 /** Enforce the limit while consuming multipart data, including chunked requests. */
 export async function readUploadForm(request: Request): Promise<FormData> {
   const limit = env.UPLOAD_MAX_BYTES + 1024 * 1024;

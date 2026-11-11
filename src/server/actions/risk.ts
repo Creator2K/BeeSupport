@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { HttpError, requireAdmin } from "@/lib/auth";
 import { adminDb } from "@/lib/tenant-db";
+import { clearRiskRuleCache } from "@/server/services/risk";
 import { resourceTenantId } from "@/server/services/tenants";
 import { recordAudit } from "@/lib/audit";
 import { getIo } from "@/lib/realtime/emit";
@@ -121,6 +122,8 @@ export async function saveRiskRuleAction(
       }
       return saved;
     });
+    // 先清缓存再做后面的事：下面断开的连接会立刻重连，重连时必须已经按新规则判断
+    clearRiskRuleCache();
     await recordAudit({
       actorId: admin.id,
       actorName: admin.name,
@@ -176,6 +179,7 @@ export async function setRiskRuleActiveAction(id: string, active: boolean) {
       where: { id },
       data: { active },
     });
+    clearRiskRuleCache();
     await recordAudit({
       actorId: admin.id,
       actorName: admin.name,
@@ -225,6 +229,7 @@ export async function deleteRiskRuleAction(id: string) {
     const admin = await requireAdmin();
     const prisma = await adminDb();
     await prisma.riskRule.deleteMany({ where: { id } });
+    clearRiskRuleCache();
     await recordAudit({
       actorId: admin.id,
       actorName: admin.name,

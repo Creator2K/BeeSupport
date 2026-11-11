@@ -34,7 +34,7 @@ export default async function WebhooksPage() {
     name: endpoint.name,
     type: endpoint.type,
     url: endpoint.url,
-    secret: endpoint.secret,
+    secretSet: Boolean(endpoint.secret),
     events: endpoint.events,
     siteId: endpoint.siteId,
     siteName: endpoint.site?.name ?? null,

@@ -19,11 +19,13 @@ export type { AiFormState, IndexStats, KnowledgeRecord } from "./ai-types";
 
 export function AiClient({
   config,
+  apiKeySet,
   entries,
   sites,
   indexStats,
 }: {
   config: AiFormState;
+  apiKeySet: boolean;
   entries: KnowledgeRecord[];
   sites: SiteOption[];
   indexStats: IndexStats;
@@ -47,6 +49,7 @@ export function AiClient({
 
         <AiConnectionTab
           form={admin.form}
+          apiKeySet={apiKeySet}
           modelOptions={admin.modelOptions}
           loadingModels={admin.loadingModels}
           testing={admin.testing}

@@ -72,12 +72,15 @@ test("operations windows use Beijing calendar days across UTC midnight and clamp
   assert.equal(window.start.toISOString(), "2026-10-14T16:00:00.000Z");
   assert.equal(operations.operationWindow(900, now).days, 30);
 });
+/** Pass null instead of overrides for a deployment where no account matches. */
 function loginFixture(userOverride = {}) {
   const limiter = loadModule("src/lib/rate-limit.ts", {
     "./redis": { getRedis: () => null },
   });
   let checks = 0;
   let sessions = 0;
+  let placeholders = 0;
+  const comparedHashes = [];
   const route = loadModule("src/app/api/auth/login/route.ts", {
     "next/server": {
       NextResponse: {
@@ -96,8 +99,13 @@ function loginFixture(userOverride = {}) {
       createSession: async () => {
         sessions++;
       },
-      verifyPassword: async (p) => {
+      hashPassword: async () => {
+        placeholders++;
+        return "placeholder-hash";
+      },
+      verifyPassword: async (p, hash) => {
         checks++;
+        comparedHashes.push(hash);
         return p === "correct";
       },
     },
@@ -105,18 +113,19 @@ function loginFixture(userOverride = {}) {
     "@/lib/db": {
       prisma: {
         user: {
-          findUnique: async ({ where }) => ({
-            id: where.email,
-            email: where.email,
-            name: "测试",
-            role: "AGENT",
-            active: true,
-            passwordHash: "unused",
-            tokenVersion: 0,
-            tenantId: "t",
-            tenant: { status: "ACTIVE" },
-            ...userOverride,
-          }),
+          findUnique: async ({ where }) =>
+            userOverride && {
+              id: where.email,
+              email: where.email,
+              name: "测试",
+              role: "AGENT",
+              active: true,
+              passwordHash: "stored-hash",
+              tokenVersion: 0,
+              tenantId: "t",
+              tenant: { status: "ACTIVE" },
+              ...userOverride,
+            },
           update: async () => {},
         },
       },
@@ -125,19 +134,21 @@ function loginFixture(userOverride = {}) {
     "@/lib/validation": { emailSchema: z.string().email() },
   });
   return {
-    login: (email, password = "correct") =>
+    login: (email, password = "correct", ip = "192.168.1.2") =>
       route.POST(
         new Request("http://test.local/api/auth/login", {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "x-beesupport-client-ip": "192.168.1.2",
+            "x-beesupport-client-ip": ip,
           },
           body: JSON.stringify({ email, password }),
         }),
       ),
     checks: () => checks,
     sessions: () => sessions,
+    placeholders: () => placeholders,
+    comparedHashes: () => comparedHashes,
   };
 }
 test("new accounts requiring verification cannot establish a session before verifying their email", async () => {
@@ -178,4 +189,109 @@ test("successful authentication clears that account's failed-attempt count witho
   assert.equal((await f.login("a@example.com")).status, 200);
   for (let i = 0; i < 32; i++) await f.login(`bad${i}@example.com`, "wrong");
   assert.equal((await f.login("new@example.com")).status, 429);
+});
+test("a failed login does not reveal whether the account exists or is disabled", async () => {
+  const generic = "邮箱或密码不正确";
+
+  const unknown = loginFixture(null);
+  const missing = await unknown.login("ghost@example.com");
+  assert.equal(missing.status, 401);
+  assert.equal((await missing.json()).error, generic);
+  await unknown.login("ghost2@example.com", "wrong");
+  // An unknown account costs the same comparison as a real one, and the
+  // stand-in hash is prepared once.
+  assert.deepEqual(unknown.comparedHashes(), [
+    "placeholder-hash",
+    "placeholder-hash",
+  ]);
+  assert.equal(unknown.placeholders(), 1);
+  assert.equal(unknown.sessions(), 0);
+
+  const disabled = loginFixture({ active: false });
+  const wrong = await disabled.login("off@example.com", "wrong");
+  assert.equal(wrong.status, 401);
+  assert.equal((await wrong.json()).error, generic);
+  assert.deepEqual(disabled.comparedHashes(), ["stored-hash"]);
+  // Only someone who knows the password is told the account is disabled.
+  const right = await disabled.login("off@example.com");
+  assert.equal(right.status, 401);
+  assert.equal((await right.json()).error, "该账号已被禁用");
+  assert.equal(disabled.sessions(), 0);
+  assert.equal(disabled.placeholders(), 0);
+
+  // Unknown and disabled accounts lock the same way as real ones.
+  for (const fixture of [unknown, disabled]) {
+    for (let i = 0; i < 10; i++) await fixture.login("probe@example.com", "wrong");
+    assert.equal((await fixture.login("probe@example.com")).status, 429);
+  }
+});
+test("wrong passwords from one address lock that address only, while many addresses together still lock the account", async () => {
+  const f = loginFixture();
+  const owner = "203.0.113.9";
+  for (let i = 0; i < 10; i++)
+    assert.equal(
+      (await f.login("boss@example.com", "wrong", "198.51.100.1")).status,
+      401,
+    );
+  assert.equal(
+    (await f.login("boss@example.com", "correct", "198.51.100.1")).status,
+    429,
+  );
+  assert.equal((await f.login("boss@example.com", "correct", owner)).status, 200);
+
+  // Nine more addresses bring the account to 100 failures in the window.
+  for (let address = 2; address <= 10; address++)
+    for (let i = 0; i < 10; i++)
+      assert.equal(
+        (await f.login("boss@example.com", "wrong", `198.51.100.${address}`))
+          .status,
+        401,
+      );
+  assert.equal((await f.login("boss@example.com", "correct", owner)).status, 429);
+  assert.equal((await f.login("other@example.com", "correct", owner)).status, 200);
+});
+test("IPv6 addresses in one /64 count as a single login source", async () => {
+  const { rateLimitSource } = loadModule("src/lib/rate-limit.ts", {
+    "./redis": { getRedis: () => null },
+  });
+  assert.equal(rateLimitSource("203.0.113.7"), "203.0.113.7");
+  for (const address of [
+    "2001:db8:12:34:aaaa:bbbb:cccc:dddd",
+    "2001:0DB8:0012:0034::1",
+    "2001:db8:12:34::",
+    "2001:db8:12:34::10.0.0.1",
+    "2001:db8:12:34:1:2:3:4%eth0",
+  ])
+    assert.equal(rateLimitSource(address), "2001:db8:12:34::/64");
+  assert.equal(rateLimitSource("2001:db8:12:35::1"), "2001:db8:12:35::/64");
+  assert.equal(rateLimitSource("2001:db8::1"), "2001:db8:0:0::/64");
+  assert.equal(rateLimitSource("fe80::1"), "fe80:0:0:0::/64");
+  // Loopback, IPv4-mapped and malformed values are counted as they are.
+  for (const value of [
+    "::1",
+    "::",
+    "::ffff:102:304",
+    "::ffff:1.2.3.4",
+    "0.0.0.0",
+    "2001:db8:::1",
+    "not-an-ip",
+    "",
+  ])
+    assert.equal(rateLimitSource(value), value);
+
+  const f = loginFixture();
+  for (let i = 1; i <= 10; i++)
+    assert.equal(
+      (await f.login("v6@example.com", "wrong", `2001:db8:12:34::${i}`)).status,
+      401,
+    );
+  assert.equal(
+    (await f.login("v6@example.com", "correct", "2001:db8:12:34:ffff::1"))
+      .status,
+    429,
+  );
+  assert.equal(
+    (await f.login("v6@example.com", "correct", "2001:db8:12:35::1")).status,
+    200,
+  );
 });

@@ -48,7 +48,11 @@ export async function authenticate(socket: Socket): Promise<Identity> {
         typeof forwarded === "string" ? forwarded : undefined,
       );
       socket.data.clientIp = ip;
-      await assertIpAllowed({ ...visitor, ip, context: "socket" }, false);
+      // 封禁地址时服务端会主动断开连接，客户端随即重连；多实例部署时这次重连可能落到
+      // 规则缓存还没过期的实例上，所以握手和身份复查不读缓存
+      await assertIpAllowed({ ...visitor, ip, context: "socket" }, false, {
+        fresh: true,
+      });
     }
     return { user: null, visitor };
   }
