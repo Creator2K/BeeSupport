@@ -20,6 +20,7 @@
     "ops:release-check": "node scripts/release-check.mjs",
     "test:recovery": "node scripts/recovery-drill.mjs",
     "e2e": "node scripts/e2e.mjs",
+    "e2e:browser": "node scripts/browser-suites.mjs",
     "e2e:ai-queue": "node scripts/ai-queue-e2e.mjs",
     "e2e:frontend": "node scripts/frontend-e2e.mjs",
     "e2e:features": "node scripts/features-e2e.mjs",
