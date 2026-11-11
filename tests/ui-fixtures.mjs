@@ -480,6 +480,10 @@ uiDependencies["./ai-knowledge-editor"] = loadModule(
   "src/app/admin/ai/ai-knowledge-editor.tsx",
   uiDependencies,
 );
+uiDependencies["@/components/brand-mark"] = loadModule(
+  "src/components/brand-mark.tsx",
+  uiDependencies,
+);
 uiDependencies["./admin-nav-brand"] = loadModule(
   "src/components/admin/admin-nav-brand.tsx",
   uiDependencies,

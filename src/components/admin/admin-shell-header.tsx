@@ -46,7 +46,7 @@ export function AdminShellHeader({
   const { t } = useLocale();
 
   return (
-    <header className="bg-background/90 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
+    <header className="glass sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b px-4 md:px-6">
       <Button
         variant="ghost"
         size="icon-sm"
@@ -74,7 +74,7 @@ export function AdminShellHeader({
         </SheetTrigger>
         <SheetContent
           side="left"
-          className="bg-sidebar flex h-dvh w-[min(288px,88vw)] flex-col gap-0 p-0"
+          className="surface-ink bg-sidebar text-sidebar-foreground flex h-dvh w-[min(288px,88vw)] flex-col gap-0 p-0"
           aria-describedby={undefined}
         >
           <SheetTitle className="sr-only">{t("nav.navigation")}</SheetTitle>

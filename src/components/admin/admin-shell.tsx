@@ -118,7 +118,7 @@ export function AdminShell({
         data-testid="desktop-sidebar"
         data-collapsed={collapsed}
         className={cn(
-          "sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground md:flex",
+          "surface-ink sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground md:flex",
           collapsed ? "w-[72px]" : "w-64",
         )}
       >

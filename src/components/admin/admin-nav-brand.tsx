@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MessagesSquare, Store } from "lucide-react";
 
+import { BrandMark } from "@/components/brand-mark";
 import { useLocale } from "@/components/locale-provider";
 import { cn } from "@/lib/utils";
 import type { ShellUser } from "./admin-shell-types";
@@ -30,16 +31,18 @@ export function AdminNavBrand({
           collapsed && "justify-center px-0",
         )}
       >
-        <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
-          B
-        </span>
+        <BrandMark className="size-8" />
         {!collapsed && (
-          <span className="font-semibold tracking-tight">BeeSupport</span>
+          <span className="text-[15px] font-semibold tracking-tight">
+            BeeSupport
+          </span>
         )}
       </Link>
       {!collapsed && (
-        <div className="bg-background/60 mx-3 mt-3 flex shrink-0 items-center gap-2.5 rounded-lg border p-3">
-          <Store className="text-muted-foreground size-4 shrink-0" />
+        <div className="bg-sidebar-accent/50 mx-3 mt-3 flex shrink-0 items-center gap-2.5 rounded-xl border p-2.5">
+          <span className="bg-sidebar-accent text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
+            <Store className="size-4" />
+          </span>
           <div className="min-w-0">
             <p className="truncate text-xs font-medium">
               {user.role === "ADMIN"
@@ -61,7 +64,7 @@ export function AdminNavBrand({
           href="/agent"
           onClick={onNavigate}
           title={t("nav.workbench")}
-          className="bg-background hover:bg-accent focus-visible:ring-ring flex h-9 items-center justify-center gap-2 rounded-lg border text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="bg-sidebar-accent focus-visible:ring-ring flex h-9 items-center justify-center gap-2 rounded-lg border text-xs font-medium transition-colors hover:bg-white/[0.13] focus-visible:ring-2 focus-visible:outline-none"
         >
           <MessagesSquare className="size-4 shrink-0" />
           <span className={collapsed ? "sr-only" : ""}>

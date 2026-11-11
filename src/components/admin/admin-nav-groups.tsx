@@ -90,7 +90,7 @@ export function AdminNavGroups({
                     aria-expanded={open}
                     aria-controls={groupId}
                     onClick={() => toggleGroup(group)}
-                    className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-ring mb-1 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    className="text-muted-foreground hover:text-sidebar-foreground focus-visible:ring-ring mb-1 flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <span>{t(group.label)}</span>
                     <ChevronDown
@@ -127,7 +127,7 @@ export function AdminNavGroups({
                       className={cn(
                         "focus-visible:ring-ring relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none",
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground before:bg-brand [&>svg]:text-brand font-medium before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full"
                           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                         collapsed && "justify-center px-0",
                       )}
@@ -142,9 +142,9 @@ export function AdminNavGroups({
                         <span
                           aria-hidden="true"
                           className={cn(
-                            "bg-primary/10 text-primary ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md px-1 text-[10px] font-medium",
+                            "bg-brand/15 text-brand ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums",
                             collapsed &&
-                              "bg-primary absolute top-1 right-1 ml-0 size-1.5 min-w-0 rounded-full p-0",
+                              "bg-brand absolute top-1 right-1 ml-0 size-1.5 min-w-0 rounded-full p-0",
                           )}
                         >
                           {collapsed ? "" : count > 99 ? "99+" : count}

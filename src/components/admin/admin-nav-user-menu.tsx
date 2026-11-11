@@ -68,7 +68,7 @@ export function AdminNavUserMenu({
             collapsed && "justify-center px-0",
           )}
         >
-          <span className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+          <span className="bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium ring-1 ring-white/10">
             {user.name.slice(0, 1)}
           </span>
           {!collapsed && (
