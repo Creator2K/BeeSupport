@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /**
  * 后台入口路径。
  *
@@ -34,9 +36,7 @@ export function resolveAdminPath(raw?: string | null): string {
 
   // 只允许单段、字母数字与 - _ . 开头
   if (!/^\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(normalized)) {
-    console.warn(
-      `[config] ADMIN_PATH=${JSON.stringify(value)} 不是合法的单段路径，已回退到 /admin`,
-    );
+    logger.warn("config.admin_path_invalid", { value, fallback: "/admin" });
     return "/admin";
   }
 
@@ -44,9 +44,10 @@ export function resolveAdminPath(raw?: string | null): string {
     normalized.toLowerCase() !== "/admin" &&
     RESERVED.has(normalized.toLowerCase())
   ) {
-    console.warn(
-      `[config] ADMIN_PATH=${normalized} 与系统路由冲突，已回退到 /admin`,
-    );
+    logger.warn("config.admin_path_reserved", {
+      value: normalized,
+      fallback: "/admin",
+    });
     return "/admin";
   }
 

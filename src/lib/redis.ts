@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 
 import { env } from "./env";
+import { logger } from "./logger";
 
 /**
  * Redis 是可选依赖：
@@ -26,7 +27,10 @@ export function getRedis(): Redis | null {
       lazyConnect: false,
     });
     globalForRedis.__beeRedis.on("error", (error: Error) => {
-      console.error("[redis] 连接异常:", error.message);
+      logger.error("redis.connection_error", {
+        client: "main",
+        reason: error.message,
+      });
     });
   }
   return globalForRedis.__beeRedis;
@@ -40,7 +44,10 @@ export function createRedisClient(): Redis | null {
   if (!env.REDIS_URL) return null;
   const client = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
   client.on("error", (error: Error) => {
-    console.error("[redis:pubsub] 连接异常:", error.message);
+    logger.error("redis.connection_error", {
+      client: "pubsub",
+      reason: error.message,
+    });
   });
   return client;
 }

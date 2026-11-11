@@ -1,11 +1,14 @@
 import type { AiJob } from "@prisma/client";
+import { logger } from "../lib/logger";
 import { claimAiJob, expireAiJobs, finishAiJob, renewAiJob } from "./services/ai-job-queue";
 import { processAutoReply } from "./services/ai-auto-reply";
 import { processKnowledgeIndex } from "./services/knowledge";
 
 export async function runAiJob(job: AiJob): Promise<void> {
   const heartbeat = setInterval(() => {
-    void renewAiJob(job).catch((error: unknown) => console.error("[ai-jobs] Lease renewal failed:", error));
+    void renewAiJob(job).catch((error: unknown) =>
+      logger.error("ai_jobs.lease_renewal_failed", { jobId: job.id }, error),
+    );
   }, 30_000);
   heartbeat.unref();
   try {
@@ -34,12 +37,18 @@ export function startAiWorker(): () => Promise<void> {
         const job = await claimAiJob();
         if (!job) break;
         const work = runAiJob(job)
-          .catch((error: unknown) => console.error("[ai-jobs] Task failed:", error))
+          .catch((error: unknown) =>
+            logger.error(
+              "ai_jobs.task_failed",
+              { jobId: job.id, kind: job.kind },
+              error,
+            ),
+          )
           .finally(() => active.delete(work));
         active.add(work);
       }
     } catch (error) {
-      console.error("[ai-jobs] Poll failed:", error);
+      logger.error("ai_jobs.poll_failed", {}, error);
     }
   };
   const tick = () => {

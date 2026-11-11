@@ -1,6 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
 import { prisma } from "./db";
+import { logger } from "./logger";
 import { env } from "./env";
 
 export type SmtpConfig = {
@@ -27,7 +28,7 @@ export async function getSmtpConfig(): Promise<SmtpConfig | null> {
     });
     stored = (setting?.value ?? undefined) as Partial<SmtpConfig> | undefined;
   } catch (error) {
-    console.error("[mail] 读取 SMTP 设置失败:", error);
+    logger.error("mail.settings_load_failed", {}, error);
   }
 
   if (stored?.host) {
@@ -114,7 +115,7 @@ export async function sendMail(
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[mail] 发送失败:", message);
+    logger.error("mail.send_failed", { reason: message });
     return { ok: false, error: message };
   }
 }

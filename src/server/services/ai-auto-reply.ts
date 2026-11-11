@@ -1,6 +1,7 @@
 import type { AiJob } from "@prisma/client";
 
 import { AiError, type AiConfig } from "../../lib/ai";
+import { logger } from "../../lib/logger";
 import type { EffectiveAiPolicy } from "../../lib/ai-policy";
 import { countOnlineAgents } from "../../lib/auth";
 import { prisma } from "../../lib/db";
@@ -111,7 +112,10 @@ export async function generateAutoReply(
   if (!decision.reply) {
     if (decision.quota) await handOffQuotaBlocked(conversationId, task, decision.quota);
     if (process.env.NODE_ENV !== "production") {
-      console.log(`[ai] 跳过自动回复：${decision.reason}`);
+      logger.info("ai.auto_reply_skipped", {
+        conversationId,
+        reason: decision.reason,
+      });
     }
     return null;
   }

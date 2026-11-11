@@ -6,6 +6,9 @@ import { z } from "zod";
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
+/** Services share one logger module; tests get a silent one unless they map their own. */
+const silentLogger = { logger: { info() {}, warn() {}, error() {} } };
+
 /** Execute the real service code with explicit IO doubles; no database or network access. */
 export function loadModule(filename, dependencies = {}, compilerOptions = {}) {
   const file = resolve(filename);
@@ -23,6 +26,7 @@ export function loadModule(filename, dependencies = {}, compilerOptions = {}) {
   const dependency = (name) => {
     if (Object.hasOwn(dependencies, name)) return dependencies[name];
     if (name.startsWith("node:")) return require(name);
+    if (/(?:^|\/)logger$/.test(name)) return silentLogger;
     throw new Error(`Unexpected dependency ${name} in ${filename}`);
   };
   new Function("require", "module", "exports", output)(

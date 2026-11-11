@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 
 import { HttpError } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 /**
  * Server Action 的统一返回结构。
@@ -26,6 +27,6 @@ export function toActionResult(error: unknown): ActionResult {
       return { ok: false, error: "该收款凭据已用于另一笔订单，请核对后再处理" };
     return { ok: false, error: "邮箱或标识已被使用，请更换后重试" };
   }
-  console.error("[action] 未处理异常:", error);
+  logger.error("action.unhandled_error", {}, error);
   return { ok: false, error: "服务器内部错误，请稍后重试" };
 }

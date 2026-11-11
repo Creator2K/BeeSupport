@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { HttpError, canAccessSite, type SessionUser } from "../../lib/auth";
 import { prisma } from "../../lib/db";
+import { logger } from "../../lib/logger";
 import { getIo } from "../../lib/realtime/emit";
 import { rooms } from "../../lib/realtime/rooms";
 import { deleteUpload } from "../../lib/storage";
@@ -158,7 +159,9 @@ export async function approveImage(user: SessionUser, id: string) {
   await emitImageGate(visitorId, image.siteId, {
     id,
     imageReviewState: result.state,
-  }).catch((error) => console.error("[image-review] Broadcast failed", error));
+  }).catch((error) =>
+    logger.error("image_review.broadcast_failed", { attachmentId: id }, error),
+  );
   return { ...result, attachmentId: id };
 }
 
@@ -194,7 +197,9 @@ export async function cancelUnsentImage(visitor: VisitorSession, id: string) {
     return image.storageKey;
   });
   await deleteUpload(storageKey).catch((error) =>
-    console.error("[image-review] Cleanup failed", error),
+    logger.error("image_review.cleanup_failed", { attachmentId: id }, error),
   );
-  await emitImageGate(visitor.visitorId, visitor.siteId).catch(console.error);
+  await emitImageGate(visitor.visitorId, visitor.siteId).catch((error) =>
+    logger.error("image_review.broadcast_failed", { attachmentId: id }, error),
+  );
 }

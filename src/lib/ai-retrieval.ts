@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { logger } from "./logger";
 import type { AiConfig } from "./ai-config";
 import { embedTexts } from "./ai-provider";
 import { cosineSimilarity } from "./ai-text";
@@ -223,10 +224,9 @@ export async function retrieveKnowledge(input: {
       const [vector] = await embedTexts(config, [input.query]);
       queryEmbedding = vector ?? null;
     } catch (error) {
-      console.error(
-        "[ai] 向量检索失败，回退关键词：",
-        error instanceof Error ? error.message : error,
-      );
+      logger.error("ai.vector_search_failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

@@ -1,5 +1,6 @@
 import { getRedis } from "../lib/redis";
 import { prisma } from "../lib/db";
+import { logger } from "../lib/logger";
 import { emitAgentPresence } from "../lib/realtime/emit";
 
 /**
@@ -67,7 +68,11 @@ export async function addAgentSocket(
         ),
       );
     } catch (error) {
-      console.error("[presence] Redis 异常，退化为内存计数:", error);
+      logger.error(
+        "presence.redis_fallback",
+        { operation: "addAgentSocket" },
+        error,
+      );
     }
   }
 
@@ -98,7 +103,11 @@ export async function removeAgentSocket(
         ),
       );
     } catch (error) {
-      console.error("[presence] Redis 异常，退化为内存计数:", error);
+      logger.error(
+        "presence.redis_fallback",
+        { operation: "removeAgentSocket" },
+        error,
+      );
     }
   }
 
@@ -121,7 +130,11 @@ export async function markVisitorOnline(
       await redis.set(visitorKey(visitorId), "1", "EX", ttlSeconds);
       return;
     } catch (error) {
-      console.error("[presence] Redis 异常，退化为内存标记:", error);
+      logger.error(
+        "presence.redis_fallback",
+        { operation: "markVisitorOnline" },
+        error,
+      );
     }
   }
   memoryVisitors.set(visitorId, Date.now() + ttlSeconds * 1000);
@@ -142,7 +155,11 @@ export async function isVisitorOnline(visitorId: string): Promise<boolean> {
     try {
       return (await redis.exists(visitorKey(visitorId))) === 1;
     } catch (error) {
-      console.error("[presence] Redis 异常，退化为内存标记:", error);
+      logger.error(
+        "presence.redis_fallback",
+        { operation: "isVisitorOnline" },
+        error,
+      );
     }
   }
   const expiresAt = memoryVisitors.get(visitorId);
@@ -173,7 +190,11 @@ export async function filterOnlineVisitors(
       });
       return online;
     } catch (error) {
-      console.error("[presence] Redis 批量查询失败，退化为内存:", error);
+      logger.error(
+        "presence.redis_fallback",
+        { operation: "filterOnlineVisitors" },
+        error,
+      );
     }
   }
 

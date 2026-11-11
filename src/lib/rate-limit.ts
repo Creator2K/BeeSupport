@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 
+import { logger } from "./logger";
 import { getRedis } from "./redis";
 
 /**
@@ -43,7 +44,7 @@ export async function rateLimit(
         resetAt: now + windowSeconds * 1000,
       };
     } catch (error) {
-      console.error("[rate-limit] Redis 异常，退化为内存限流:", error);
+      logger.error("rate_limit.redis_fallback", {}, error);
     }
   }
 

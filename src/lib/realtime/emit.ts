@@ -7,6 +7,7 @@ import type {
   SerializedMessage,
 } from "./types";
 import { prisma } from "../db";
+import { logger } from "../logger";
 import { rooms } from "./rooms";
 import { visitorConversation, visitorMessage } from "./public";
 
@@ -136,7 +137,9 @@ export function emitAgentPresence(
           { userId, status },
         );
     })
-    .catch(console.error);
+    .catch((error: unknown) =>
+      logger.error("realtime.agent_presence_failed", { userId }, error),
+    );
 }
 
 export function emitVisitorPresence(visitorId: string, online: boolean): void {
@@ -158,7 +161,9 @@ export function emitVisitorPresence(visitorId: string, online: boolean): void {
           { visitorId, online },
         );
     })
-    .catch(console.error);
+    .catch((error: unknown) =>
+      logger.error("realtime.visitor_presence_failed", { visitorId }, error),
+    );
 }
 
 /** 通知具体某个客服（新会话指派、转接提醒等） */

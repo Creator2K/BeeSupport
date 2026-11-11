@@ -43,14 +43,11 @@ function fixture(endpoints = []) {
 
 async function withFetch(fetch, callback) {
   const saved = globalThis.fetch;
-  const savedError = console.error;
   globalThis.fetch = fetch;
-  console.error = () => {};
   try {
     await callback();
   } finally {
     globalThis.fetch = saved;
-    console.error = savedError;
   }
 }
 

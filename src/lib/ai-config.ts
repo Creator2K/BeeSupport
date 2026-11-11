@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { logger } from "./logger";
 
 /**
  * AI 助手：任意 OpenAI 兼容接口（/v1/chat/completions、/v1/models、/v1/embeddings）。
@@ -126,7 +127,7 @@ export async function getAiConfig(): Promise<AiConfig> {
       autoReply: (stored.autoReply ?? defaults.autoReply) as AiAutoReply,
     };
   } catch (error) {
-    console.error("[ai] 读取配置失败:", error);
+    logger.error("ai.config_load_failed", {}, error);
     return defaults;
   }
 }

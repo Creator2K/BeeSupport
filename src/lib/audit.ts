@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "./db";
+import { logger } from "./logger";
 
 /**
  * 后台操作审计。写日志失败不应该影响主流程，因此只记错误不抛出。
@@ -36,6 +37,6 @@ export async function recordAudit(input: AuditInput): Promise<void> {
       },
     });
   } catch (error) {
-    console.error("[audit] 写入审计日志失败:", error);
+    logger.error("audit.write_failed", { action: input.action }, error);
   }
 }

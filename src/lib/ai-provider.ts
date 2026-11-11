@@ -6,6 +6,7 @@ import {
   type AiConfig,
 } from "./ai-config";
 import { readAiError, readAiJson } from "./ai-response";
+import { logger } from "./logger";
 
 /* ---------------- 模型列表 ---------------- */
 
@@ -151,9 +152,10 @@ export async function chatCompletion(
   // 有些 OpenAI 兼容网关还不支持 tools，这里退一步重试一次普通对话
   if (!response.ok && body.tools && [400, 404, 422].includes(response.status)) {
     const text = await readAiError(response);
-    console.warn(
-      `[ai] 接口不支持工具调用（${response.status}），已退化为普通对话：${text.slice(0, 120)}`,
-    );
+    logger.warn("ai.tools_unsupported", {
+      status: response.status,
+      detail: text.slice(0, 120),
+    });
     const fallback = { ...body };
     delete fallback.tools;
     delete fallback.tool_choice;

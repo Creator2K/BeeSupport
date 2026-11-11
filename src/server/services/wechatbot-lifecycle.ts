@@ -1,6 +1,7 @@
 import { WeChatBot, type Credentials } from "@wechatbot/wechatbot";
 
 import { HttpError } from "../../lib/auth";
+import { logger } from "../../lib/logger";
 import { getWechatConfig } from "./wechatbot-config";
 import {
   CODE_TIMEOUT_MS,
@@ -156,7 +157,7 @@ export function stopWechatBot(note = "已停止"): WechatBotState {
   try {
     state.bot?.stop();
   } catch (error) {
-    console.error("[wechatbot] 停止失败:", error);
+    logger.error("wechat.stop_failed", {}, error);
   }
   state.bot = null;
   state.status = "stopped";
@@ -183,7 +184,7 @@ export async function logoutWechatBot(): Promise<WechatBotState> {
       await new FileStorage(wechatStorageDir()).clear();
     }
   } catch (error) {
-    console.error("[wechatbot] 清理凭证失败:", error);
+    logger.error("wechat.credentials_clear_failed", {}, error);
   }
 
   state.bot = null;
@@ -202,6 +203,6 @@ export async function ensureWechatBot(): Promise<void> {
     if (!config.enabled) return;
     await startWechatBot();
   } catch (error) {
-    console.error("[wechatbot] 自动启动失败:", error);
+    logger.error("wechat.autostart_failed", {}, error);
   }
 }

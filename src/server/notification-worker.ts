@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { NotificationJob } from "@prisma/client";
 import { prisma } from "../lib/db";
+import { logger } from "../lib/logger";
 import { sendMail, type SendMailInput } from "../lib/mail";
 import { sendWebhookDelivery, type WebhookPayload } from "../lib/webhooks";
 import { deliverExpiryMail } from "./services/subscription-reminders";
@@ -155,7 +156,7 @@ export function startNotificationWorker(): () => Promise<void> {
       if (failure?.status === "rejected") throw failure.reason;
     })()
       .catch((error: unknown) =>
-        console.error("[notifications] Worker failed:", error),
+        logger.error("notifications.worker_failed", {}, error),
       )
       .finally(() => {
         running = null;

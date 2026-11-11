@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { toErrorResponse } from "@/lib/api";
 import { HttpError, canAccessSite, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import {
   assertTenantQuota,
   assertSiteServing,
@@ -82,7 +83,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
     });
   } catch (error) {
-    if (storageKey) await deleteUpload(storageKey).catch(console.error);
+    if (storageKey)
+      await deleteUpload(storageKey).catch((cleanupError: unknown) =>
+        logger.error("uploads.cleanup_failed", { storageKey }, cleanupError),
+      );
     return toErrorResponse(error);
   } finally {
     releaseSlot?.();

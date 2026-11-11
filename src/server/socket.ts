@@ -1,5 +1,6 @@
 import type { Server } from "socket.io";
 
+import { logger } from "../lib/logger";
 import { setIo } from "../lib/realtime/emit";
 import { authenticate, type Identity } from "./socket-auth";
 import { initializeSocketConnection } from "./socket-lifecycle";
@@ -28,7 +29,7 @@ export function registerRealtime(io: Server): void {
       session.refreshIdentity,
     );
     void initialized.catch((error: unknown) => {
-      console.error("[realtime] ?????:", error);
+      logger.error("realtime.connection_init_failed", {}, error);
       socket.disconnect(true);
     });
     registerSocketEvents({ io, socket, identity, initialized, session });

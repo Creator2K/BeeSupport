@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/db";
+import { logger } from "../../lib/logger";
 import type { WechatBotConfig } from "./wechatbot-runtime";
 
 export const WECHATBOT_SETTING_KEY = "wechatbot";
@@ -25,7 +26,7 @@ export async function getWechatConfig(): Promise<WechatBotConfig> {
         typeof stored.defaultTo === "string" ? stored.defaultTo : defaults.defaultTo,
     };
   } catch (error) {
-    console.error("[wechatbot] 读取配置失败:", error);
+    logger.error("wechat.config_load_failed", {}, error);
     return defaults;
   }
 }

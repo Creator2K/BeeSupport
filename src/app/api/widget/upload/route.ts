@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { toErrorResponse } from "@/lib/api";
 import { HttpError } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import {
   acquireUploadSlot,
@@ -130,7 +131,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     storageKey = undefined;
     if (attachment.imageReviewState === "PENDING")
       await emitImageGate(visitor.visitorId, visitor.siteId).catch(
-        console.error,
+        (error: unknown) =>
+          logger.error(
+            "image_review.broadcast_failed",
+            { attachmentId: attachment.id },
+            error,
+          ),
       );
 
     return NextResponse.json({
@@ -138,7 +144,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       attachment: serializeAttachment(attachment),
     });
   } catch (error) {
-    if (storageKey) await deleteUpload(storageKey).catch(console.error);
+    if (storageKey)
+      await deleteUpload(storageKey).catch((cleanupError: unknown) =>
+        logger.error("uploads.cleanup_failed", { storageKey }, cleanupError),
+      );
     return toErrorResponse(error);
   } finally {
     releaseSlot?.();

@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger";
 import { generateUnansweredReminders } from "./unanswered-generation";
 
 export function startUnansweredReminderWorker() {
@@ -13,7 +14,7 @@ export function startUnansweredReminderWorker() {
       })
       .catch((error) => {
         cursor = undefined;
-        console.error("[unanswered-reminders] 检查失败:", error);
+        logger.error("unanswered_reminders.check_failed", {}, error);
       })
       .finally(() => {
         running = null;

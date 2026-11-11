@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "../../lib/db";
 import { getSmtpConfig, sendMail } from "../../lib/mail";
 import { env } from "../../lib/env";
+import { logger } from "../../lib/logger";
 import { ADMIN_PATH } from "../../lib/app-paths";
 import type { PreparedAccountMail } from "./account-mail";
 import {
@@ -169,7 +170,7 @@ export function startSubscriptionReminderWorker() {
         cursor = result.cursor;
       })
       .catch((error) =>
-        console.error("[subscription-reminders] 检查失败:", error),
+        logger.error("subscription_reminders.check_failed", {}, error),
       )
       .finally(() => {
         running = null;

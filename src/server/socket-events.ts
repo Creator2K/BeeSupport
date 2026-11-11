@@ -3,6 +3,7 @@ import type { Server, Socket } from "socket.io";
 import { canAccessSite } from "../lib/auth";
 import { rateLimit } from "../lib/rate-limit";
 import { prisma } from "../lib/db";
+import { logger } from "../lib/logger";
 import {
   emitAgentPresence,
   emitTyping,
@@ -46,7 +47,7 @@ export function registerSocketEvents({
           callback(payload, typeof ack === "function" ? ack : undefined),
         )
         .catch((error: unknown) => {
-          console.error(`[realtime] ${event} 失败:`, error);
+          logger.error("realtime.event_failed", { event }, error);
           if (typeof ack === "function")
             ack({ ok: false, error: "无法完成操作" });
         });
@@ -198,7 +199,7 @@ export function registerSocketEvents({
         }
       })
       .catch((error: unknown) =>
-        console.error("[realtime] 断开连接清理失败:", error),
+        logger.error("realtime.disconnect_cleanup_failed", {}, error),
       );
   });
 }

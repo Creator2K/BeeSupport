@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { logger } from "./logger";
 import { retryNotification } from "../server/retry";
 import type { WebhookPayload, DeliveryResult } from "./webhook-types";
 import {
@@ -67,7 +68,11 @@ export async function dispatchWebhooks(payload: WebhookPayload): Promise<void> {
               },
             });
           } catch (error) {
-            console.error(`[webhook] ${endpoint.name} 推送失败:`, error);
+            logger.error(
+              "webhook.delivery_failed",
+              { endpointId: endpoint.id, endpointName: endpoint.name },
+              error,
+            );
             await prisma.webhookEndpoint
               .updateMany({
                 where: { id: endpoint.id },
@@ -86,7 +91,7 @@ export async function dispatchWebhooks(payload: WebhookPayload): Promise<void> {
       }),
     );
   } catch (error) {
-    console.error("[webhook] 分发失败:", error);
+    logger.error("webhook.dispatch_failed", {}, error);
   }
 }
 

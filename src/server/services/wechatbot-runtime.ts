@@ -3,6 +3,7 @@ import path from "node:path";
 import type { WeChatBot } from "@wechatbot/wechatbot";
 
 import { env } from "../../lib/env";
+import { logger } from "../../lib/logger";
 
 export type WechatBotConfig = {
   /** 打开后进程启动即自动登录，并在掉线时保留登录态 */
@@ -83,8 +84,8 @@ export function log(level: "info" | "error", message: string): void {
     { at: new Date().toISOString(), level, message: message.slice(0, 300) },
     ...state.logs,
   ].slice(0, MAX_LOGS);
-  if (level === "error") console.error(`[wechatbot] ${message}`);
-  else console.log(`[wechatbot] ${message}`);
+  if (level === "error") logger.error("wechat.runtime", { message });
+  else logger.info("wechat.runtime", { message });
 }
 
 /* ---------------- 配置 ---------------- */
