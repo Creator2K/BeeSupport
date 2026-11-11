@@ -76,8 +76,12 @@ export function StatCard({
 }) {
   return (
     <div
-      className={`bg-card rounded-xl border p-4 shadow-xs ${className ?? ""}`}
+      className={`bg-card relative overflow-hidden rounded-xl border p-4 shadow-xs ${className ?? ""}`}
     >
+      <span
+        aria-hidden
+        className="via-brand/70 absolute inset-x-4 top-0 h-px bg-linear-to-r from-transparent to-transparent"
+      />
       <p className="text-muted-foreground text-xs font-medium">{label}</p>
       <p className="mt-2 text-[1.75rem] leading-none font-semibold tracking-tight tabular-nums">
         {value}

@@ -54,7 +54,7 @@ export function VisitorTrend({
               className="group flex h-full min-w-0 flex-1 items-end rounded-t focus-visible:outline-2 focus-visible:outline-ring"
             >
               <span
-                className={`w-full rounded-t-sm transition-colors ${activeDay === index ? "bg-emerald-400" : "bg-emerald-600/80"}`}
+                className={`w-full rounded-t-sm transition-colors ${activeDay === index ? "bg-brand" : "bg-brand-strong/85 dark:bg-brand/60"}`}
                 style={{
                   height: `${Math.max(row.count ? 2 : 0.7, (row.count / max) * 95)}%`,
                 }}

@@ -5,14 +5,14 @@ import {
 } from "./visitor-insights-shared";
 
 const colors = [
-  "#10b981",
-  "#3b82f6",
-  "#a78bfa",
-  "#f59e0b",
-  "#ec4899",
-  "#64748b",
-  "#06b6d4",
-  "#84cc16",
+  "#d49a1f",
+  "#5f7f9e",
+  "#c0623b",
+  "#7f9f73",
+  "#9a6b91",
+  "#4a9690",
+  "#c9ad7f",
+  "#8c8174",
 ];
 
 export function VisitorBreakdown({

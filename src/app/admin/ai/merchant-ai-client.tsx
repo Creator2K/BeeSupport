@@ -110,12 +110,12 @@ export function MerchantAiClient({ settings }: { settings: MerchantAiSettings })
   return (
     <div className="max-w-5xl space-y-5">
       {!settings.featureEnabled ? (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-950 dark:text-amber-200">
           当前套餐未开通 AI 功能。策略可以预先配置，但不会产生 AI 回复或调用。
         </div>
       ) : null}
       {!settings.providerReady ? (
-        <div className="rounded-lg border border-sky-400 bg-sky-50 p-4 text-sm text-sky-950">
+        <div className="bg-muted/60 text-foreground rounded-xl border p-4 text-sm">
           平台尚未启用 AI 接口。策略可以保存，接口就绪后才会生效。
         </div>
       ) : null}

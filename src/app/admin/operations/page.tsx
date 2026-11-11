@@ -115,7 +115,7 @@ export default async function Page({
                 width={Math.max(2, 900 / data.days - 4)}
                 height={height}
                 rx="2"
-                fill="#16824d"
+                className="fill-brand-strong"
               >
                 <title>{`${row.day}：${formatPrice(row.revenueCents)}`}</title>
               </rect>
