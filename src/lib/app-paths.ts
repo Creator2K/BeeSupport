@@ -24,6 +24,11 @@ const RESERVED = new Set([
   "/home-preview",
   "/widget.js",
   "/favicon.ico",
+  "/icon.svg",
+  "/apple-icon.png",
+  "/opengraph-image.png",
+  "/robots.txt",
+  "/sitemap.xml",
   "/_next",
 ]);
 
