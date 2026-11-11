@@ -71,7 +71,10 @@ export function ConversationHeader({
             </Badge>
           ) : null}
         </div>
-        <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+        <div
+          className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
+          suppressHydrationWarning
+        >
           <span
             className={cn(
               "size-1.5 rounded-full",

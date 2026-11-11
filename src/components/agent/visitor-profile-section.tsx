@@ -79,7 +79,10 @@ export function VisitorProfileSection({
           <div className="truncate text-sm">
             {visitor.name ?? visitor.email}
           </div>
-          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+          <div
+            className="text-muted-foreground flex items-center gap-1.5 text-[11px]"
+            suppressHydrationWarning
+          >
             <span
               className={cn(
                 "size-1.5 rounded-full",

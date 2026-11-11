@@ -47,7 +47,10 @@ export function ConversationListItem({
           <span className="min-w-0 flex-1 truncate text-sm">
             {name}
           </span>
-          <span className="text-foreground/75 shrink-0 text-[10px]">
+          <span
+            className="text-foreground/75 shrink-0 text-[10px]"
+            suppressHydrationWarning
+          >
             {formatRelative(conversation.lastMessageAt)}
           </span>
         </span>
