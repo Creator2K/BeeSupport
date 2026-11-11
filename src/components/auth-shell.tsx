@@ -36,7 +36,10 @@ export async function AuthShell({
           <ConversationSketch />
         </div>
 
-        <p className="max-w-md text-3xl leading-[1.2] font-semibold tracking-tight xl:text-[2.5rem]">
+        <p
+          className="animate-rise-soft max-w-md text-3xl leading-[1.2] font-semibold tracking-tight xl:text-[2.5rem]"
+          style={{ animationDelay: "250ms" }}
+        >
           {t("app.tagline")}
         </p>
       </aside>
@@ -55,7 +58,12 @@ export async function AuthShell({
           <div className="flex items-center gap-1">{actions}</div>
         </header>
         <main className="flex flex-1 items-center justify-center px-5 pt-6 pb-16">
-          <div className={cn("w-full", wide ? "max-w-md" : "max-w-sm")}>
+          <div
+            className={cn(
+              "animate-stagger w-full",
+              wide ? "max-w-md" : "max-w-sm",
+            )}
+          >
             {children}
           </div>
         </main>
@@ -67,7 +75,11 @@ export async function AuthShell({
 /** 品牌面板上的对话示意图：只有色块，没有文字，纯装饰。 */
 function ConversationSketch() {
   return (
-    <div aria-hidden="true" className="w-full max-w-sm">
+    <div
+      aria-hidden="true"
+      className="animate-float-in w-full max-w-sm"
+      style={{ animationDelay: "120ms" }}
+    >
       <div className="rounded-2xl border bg-white/[0.04] p-5 shadow-2xl">
         <div className="flex items-center gap-3">
           <span className="bg-brand/20 ring-brand/40 size-9 shrink-0 rounded-full ring-1" />
@@ -78,18 +90,33 @@ function ConversationSketch() {
           <span className="bg-success size-2 rounded-full" />
         </div>
         <div className="mt-6 space-y-3">
-          <div className="w-4/5 rounded-2xl rounded-bl-md border bg-white/[0.05] p-3.5">
+          <div
+            className="animate-bubble w-4/5 origin-bottom-left rounded-2xl rounded-bl-md border bg-white/[0.05] p-3.5"
+            style={{ animationDelay: "700ms" }}
+          >
             <span className="block h-1.5 w-full rounded-full bg-white/20" />
             <span className="mt-2.5 block h-1.5 w-2/3 rounded-full bg-white/20" />
           </div>
-          <div className="bg-brand ml-auto w-3/5 rounded-2xl rounded-br-md p-3.5">
+          <div
+            className="bg-brand animate-bubble ml-auto w-3/5 origin-bottom-right rounded-2xl rounded-br-md p-3.5"
+            style={{ animationDelay: "1050ms" }}
+          >
             <span className="bg-brand-foreground/35 block h-1.5 w-full rounded-full" />
             <span className="bg-brand-foreground/35 mt-2.5 block h-1.5 w-1/2 rounded-full" />
           </div>
-          <div className="flex w-fit items-center gap-1.5 rounded-2xl rounded-bl-md border bg-white/[0.05] px-3.5 py-3">
-            <span className="size-1.5 rounded-full bg-white/45" />
-            <span className="size-1.5 rounded-full bg-white/30" />
-            <span className="size-1.5 rounded-full bg-white/20" />
+          <div
+            className="animate-bubble flex w-fit origin-bottom-left items-center gap-1.5 rounded-2xl rounded-bl-md border bg-white/[0.05] px-3.5 py-3"
+            style={{ animationDelay: "1400ms" }}
+          >
+            {["bg-white/45", "bg-white/30", "bg-white/20"].map(
+              (tone, index) => (
+                <span
+                  key={tone}
+                  className={cn("animate-typing-dot size-1.5 rounded-full", tone)}
+                  style={{ animationDelay: `${1900 + index * 160}ms` }}
+                />
+              ),
+            )}
           </div>
         </div>
       </div>

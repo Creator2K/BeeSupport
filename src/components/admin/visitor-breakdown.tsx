@@ -60,10 +60,11 @@ export function VisitorBreakdown({
               aria-valuenow={row.count}
             >
               <div
-                className="h-full rounded-full"
+                className="animate-grow-x h-full rounded-full"
                 style={{
                   width: `${total ? Math.min(100, (row.count / total) * 100) : 0}%`,
                   backgroundColor: colors[index % colors.length],
+                  animationDelay: `${index * 60}ms`,
                 }}
               />
             </div>

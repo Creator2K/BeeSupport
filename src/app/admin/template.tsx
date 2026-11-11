@@ -1,5 +1,6 @@
 /**
- * 每次后台内导航都会新建一个 template 实例，用来播放入场动画。
+ * 每次后台内导航都会新建一个 template 实例，用来播放入场动画：整页上浮淡入，
+ * 页面里的各区块再依次跟上（见 globals.css 的 .animate-page）。
  * 内容流式返回时也会一并淡入，避免「页面卡住不动」的错觉。
  */
 export default function AdminTemplate({
@@ -7,5 +8,5 @@ export default function AdminTemplate({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="animate-rise">{children}</div>;
+  return <div className="animate-page">{children}</div>;
 }

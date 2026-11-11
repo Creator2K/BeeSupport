@@ -325,6 +325,59 @@
   }
 }
 
+@keyframes bee-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes bee-rise-soft {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes bee-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes bee-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes bee-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+}
+
+@keyframes bee-bubble {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+}
+
+@keyframes bee-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.5;
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 @layer utilities {
   /* 聊天消息区域：保留换行、长链接自动折行 */
   .chat-text {
@@ -381,6 +434,80 @@
   }
   .stagger-6 {
     animation-delay: 180ms;
+  }
+
+  /* 下面这些入场都用 backwards 填充：播完就把 opacity / transform 还给元素自己的样式。
+     逐项的延迟写在行内 style 里，[animation-delay:…] 这类任意值类会被这里的 animation 简写盖掉 */
+
+  /* 后台切页：整页上浮淡入，页面里的各区块再依次跟上；已带 animate-* 的区块保持自己的节奏 */
+  .animate-page {
+    animation: bee-page-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-page > * > :not([class*="animate-"]) {
+    animation: bee-rise-soft 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-page > * > :not([class*="animate-"]):nth-child(2) {
+    animation-delay: 50ms;
+  }
+  .animate-page > * > :not([class*="animate-"]):nth-child(3) {
+    animation-delay: 100ms;
+  }
+  .animate-page > * > :not([class*="animate-"]):nth-child(4) {
+    animation-delay: 150ms;
+  }
+  .animate-page > * > :not([class*="animate-"]):nth-child(5) {
+    animation-delay: 200ms;
+  }
+  .animate-page > * > :not([class*="animate-"]):nth-child(n + 6) {
+    animation-delay: 250ms;
+  }
+
+  /* 子元素依次上浮入场：登录、入驻申请等表单页 */
+  .animate-stagger > * {
+    animation: bee-rise-soft 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-stagger > :nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .animate-stagger > :nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .animate-stagger > :nth-child(4) {
+    animation-delay: 210ms;
+  }
+  .animate-stagger > :nth-child(n + 5) {
+    animation-delay: 280ms;
+  }
+
+  .animate-rise-soft {
+    animation: bee-rise-soft 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  /* 图表：柱子从底部长出，条形从左侧展开 */
+  .animate-grow-y {
+    transform-origin: bottom;
+    animation: bee-grow-y 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-grow-x {
+    transform-origin: left;
+    animation: bee-grow-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  /* 登录页品牌面板的示意图：卡片浮入、气泡依次弹出、输入中的三个点轻轻起伏 */
+  .animate-float-in {
+    animation: bee-float-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-bubble {
+    animation: bee-bubble 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .animate-typing-dot {
+    animation: bee-typing-dot 1.4s ease-in-out infinite;
   }
 
   /* 可点区域的统一反馈：轻微抬起 + 按下回弹 */
@@ -519,6 +646,13 @@
   100% {
     transform: translateX(100%);
   }
+}
+
+/* 深浅色切换：关掉默认的交叉淡化，新主题由 theme-toggle 从点击处圆形展开 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
 /* 尊重系统的「减少动态效果」设置 */
