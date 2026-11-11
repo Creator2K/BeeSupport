@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthShell } from "@/components/auth-shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   AccountAccessForm,
@@ -19,34 +20,28 @@ const copy = {
 export async function AccountAccessPage({ mode }: { mode: AccountAccessMode }) {
   const smtpReady = Boolean(await getSmtpConfig());
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center justify-between px-5 py-4">
-        <Link href="/" className="text-sm font-semibold">
-          BeeSupport
-        </Link>
-        <ThemeToggle />
-      </header>
-      <main className="flex flex-1 items-center justify-center px-5 py-12">
-        <div className="w-full max-w-sm space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold">{copy[mode][0]}</h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {copy[mode][1]}
-            </p>
-          </div>
-          {!smtpReady && (mode === "forgot" || mode === "verify") && (
-            <p className="rounded-lg border p-3 text-sm leading-6 text-muted-foreground">
-              平台尚未配置邮件服务。请联系管理员使用后台重置密码入口；已有邮件链接仍可提交。
-            </p>
-          )}
-          <AccountAccessForm mode={mode} />
-          <p className="text-center text-sm text-muted-foreground">
-            <Link href="/login" className="underline">
-              返回登录
-            </Link>
+    <AuthShell actions={<ThemeToggle />}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl leading-tight font-semibold tracking-tight">
+            {copy[mode][0]}
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm leading-6">
+            {copy[mode][1]}
           </p>
         </div>
-      </main>
-    </div>
+        {!smtpReady && (mode === "forgot" || mode === "verify") && (
+          <p className="bg-card text-muted-foreground rounded-xl border p-3.5 text-sm leading-6">
+            平台尚未配置邮件服务。请联系管理员使用后台重置密码入口；已有邮件链接仍可提交。
+          </p>
+        )}
+        <AccountAccessForm mode={mode} />
+        <p className="text-muted-foreground text-center text-sm">
+          <Link href="/login" className="underline underline-offset-4">
+            返回登录
+          </Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 }

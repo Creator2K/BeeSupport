@@ -22,7 +22,7 @@ export function RegisterForm() {
     return (
       <p
         role="status"
-        className="rounded-lg border bg-muted p-5 text-sm leading-6"
+        className="bg-card rounded-xl border p-5 text-sm leading-6 shadow-xs"
       >
         {result.text}
       </p>

@@ -36,7 +36,7 @@ export function AccountAccessFields({
   return (
     <form className="space-y-4" onSubmit={submit}>
       {details && (
-        <div className="rounded-lg border bg-muted/50 p-4 text-sm leading-6">
+        <div className="bg-card rounded-xl border p-4 text-sm leading-6">
           <p className="break-all">{details.email}</p>
           {mode === "invite" && (
             <p>

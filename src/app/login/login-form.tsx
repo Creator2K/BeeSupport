@@ -59,7 +59,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="shadow-none">
+    <Card className="shadow-md">
       <CardHeader className="sr-only">
         <CardTitle>{t("auth.title")}</CardTitle>
         <CardDescription>{t("auth.subtitle")}</CardDescription>
@@ -94,7 +94,7 @@ export function LoginForm() {
           </div>
 
           {error ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {error}
             </p>
           ) : null}

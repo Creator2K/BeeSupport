@@ -24,7 +24,7 @@ export function AccountAccessForm({ mode }: { mode: AccountAccessMode }) {
       <div className="space-y-5">
         <p
           role="status"
-          className="rounded-lg border bg-muted p-4 text-sm leading-6"
+          className="bg-card rounded-xl border p-4 text-sm leading-6 shadow-xs"
         >
           {message}
         </p>
