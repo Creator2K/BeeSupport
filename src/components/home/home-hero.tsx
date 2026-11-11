@@ -14,7 +14,7 @@ export function HomeHero({
   secondaryAnchor: string;
 }) {
   return (
-    <>
+    <div className={`${styles.heroBand} pattern-hex`}>
       <section className={`${styles.container} ${styles.hero}`}>
         <div className={styles.heroCopy}>
           <p className={styles.heroEyebrow}>
@@ -56,6 +56,6 @@ export function HomeHero({
         </p>
         <span className={styles.statementLine} />
       </div>
-    </>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, MessageCircleMore } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 
+import { BrandMark } from "@/components/brand-mark";
 import { AppearanceDemo } from "@/components/home/appearance-demo";
 import type { HomeContent, PublicHomePlan } from "@/lib/homepage-content";
 
@@ -48,7 +49,7 @@ export function HomeView({
         <HomeSteps enabled={content.sections.steps} />
         {content.sections.faq && <HomeFaq faqs={content.faqs} />}
         <HomePlans plans={plans} />
-        <section className={styles.closing}>
+        <section className={`${styles.closing} pattern-hex`}>
           <div className={styles.container}>
             <p className={styles.eyebrow}>LET’S TALK BETTER</p>
             <h2>{content.closingTitle}</h2>
@@ -64,15 +65,15 @@ export function HomeView({
             </p>
           </div>
           <span className={styles.closingArt} aria-hidden="true">
-            <MessageCircleMore />
+            <BrandMark />
           </span>
         </section>
       </main>
       <footer className={`${styles.container} ${styles.footer}`}>
         <div>
           <Link href="/" className={styles.footerBrand}>
+            <BrandMark />
             {content.brandName}
-            <span>●</span>
           </Link>
           <p>{content.footerText}</p>
         </div>

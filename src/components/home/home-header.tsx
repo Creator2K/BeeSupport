@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, MessageCircleMore } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
+import { BrandMark } from "@/components/brand-mark";
 import type { HomeContent } from "@/lib/homepage-content";
 
 import styles from "./home.module.css";
@@ -14,9 +15,7 @@ export function HomeHeader({ content }: { content: HomeContent }) {
           aria-label={`${content.brandName} 首页`}
           className={styles.brand}
         >
-          <span>
-            <MessageCircleMore size={21} />
-          </span>
+          <BrandMark />
           <span className={styles.brandText}>{content.brandName}</span>
         </Link>
         <nav aria-label="首页导航" className={styles.navLinks}>

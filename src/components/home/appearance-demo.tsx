@@ -7,10 +7,10 @@ import { launcherStyleOptions, type LauncherStyle } from "@/lib/launcher";
 import styles from "./home.module.css";
 
 const colors = [
+  { name: "经典黑", value: "#18181b" },
+  { name: "暖阳黄", value: "#eab308" },
   { name: "森林绿", value: "#135b46" },
   { name: "晴空蓝", value: "#2563eb" },
-  { name: "暖阳黄", value: "#eab308" },
-  { name: "经典黑", value: "#18181b" },
 ];
 const prompts = [
   {

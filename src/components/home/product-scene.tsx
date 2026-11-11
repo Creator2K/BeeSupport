@@ -5,13 +5,15 @@ import {
   Globe2,
   Headset,
   ImageIcon,
-  MessageCircleMore,
   MoreHorizontal,
   Paperclip,
   Send,
   ShieldCheck,
   Smile,
 } from "lucide-react";
+
+import { BrandMark } from "@/components/brand-mark";
+
 import styles from "./home.module.css";
 
 export function ProductScene({
@@ -23,7 +25,7 @@ export function ProductScene({
     <div className={styles.scene} aria-label="多站点客服工作台界面示意">
       <div className={styles.sceneTop}>
         <span className={styles.sceneLogo}>
-          <MessageCircleMore size={16} /> {brandName}
+          <BrandMark /> {brandName}
         </span>
         <span className={styles.sceneTag}>一个工作台，连接每个站点</span>
         <MoreHorizontal size={18} aria-hidden="true" />
