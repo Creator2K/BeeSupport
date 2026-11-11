@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, SearchX } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 
 import { SectionStatus } from "@/components/status-screen";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ export default async function AdminNotFound() {
 
   return (
     <SectionStatus
-      icon={<SearchX />}
+      code="404"
       title={t("status.sectionNotFoundTitle")}
       description={t("status.sectionNotFoundBody")}
       actions={
