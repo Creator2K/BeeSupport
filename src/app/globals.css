@@ -6,7 +6,7 @@
   --success-text: #166534;
 }
 
-/* 亮色为主、暗色可切：用 class 策略（next-themes attribute="class"）。
+/* 亮色为主、暗色可切：由 <html> 上的 dark class 决定（见 src/lib/theme.ts）。
    .surface-ink 是亮色模式下也保持墨色的区域（侧栏、品牌面板），里面的 dark: 样式同样生效。 */
 @custom-variant dark (&:is(.dark *, .surface-ink *));
 

@@ -1,21 +1,15 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { useT } from "@/components/locale-provider";
+import { setTheme, useTheme } from "@/components/use-theme";
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const isDark = useTheme() === "dark";
   const t = useT();
-
-  useEffect(() => setMounted(true), []);
-
-  const isDark = mounted && resolvedTheme === "dark";
 
   const toggle = (event: React.MouseEvent<HTMLButtonElement>) => {
     const next = isDark ? "light" : "dark";
@@ -34,7 +28,7 @@ export function ThemeToggle() {
       Math.max(x, window.innerWidth - x),
       Math.max(y, window.innerHeight - y),
     );
-    // next-themes 在 effect 里改 <html> 的 class，flushSync 让它在视图过渡拍新画面之前生效
+    // flushSync 让按钮图标在视图过渡拍下新画面之前就换好
     const transition = document.startViewTransition(() => {
       flushSync(() => setTheme(next));
     });

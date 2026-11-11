@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 
 import { LocaleProvider } from "@/components/locale-provider";
-import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { getServerT } from "@/lib/i18n/server";
 import { siteUrl } from "@/lib/site-url";
+import { themeInitScript } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -44,18 +44,14 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="bg-background text-foreground min-h-dvh antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <LocaleProvider locale={locale}>
-            {children}
-            <Toaster position="top-center" richColors closeButton />
-          </LocaleProvider>
-        </ThemeProvider>
+        <LocaleProvider locale={locale}>
+          {children}
+          <Toaster position="top-center" richColors closeButton />
+        </LocaleProvider>
       </body>
     </html>
   );
