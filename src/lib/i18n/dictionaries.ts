@@ -715,6 +715,22 @@ export const zhCN = {
   "workbench.aiTools": "工具",
   "workbench.aiKnowledge": "知识库",
   "widget.aiLabel": "AI 助手",
+  "status.notFoundTitle": "页面不存在",
+  "status.notFoundBody": "这个地址可能输错了，或者页面已经被移动、删除。",
+  "status.errorTitle": "页面出了点问题",
+  "status.errorBody":
+    "加载这个页面时出错了，可以重试一次。如果问题一直出现，请联系网站管理员。",
+  "status.errorId": "错误编号 {id}",
+  "status.toConsole": "前往控制台",
+  "status.sectionNotFoundTitle": "找不到这个页面或记录",
+  "status.sectionNotFoundBody": "它可能已经被删除，或者当前账号没有权限查看。",
+  "status.sectionErrorTitle": "这部分内容没能加载出来",
+  "status.sectionErrorBody":
+    "可以重试一次。如果问题一直出现，请联系系统管理员。",
+  "status.backToOverview": "返回概览",
+  "status.backToWorkbench": "返回工作台",
+  "status.widgetUnavailableTitle": "客服窗口暂时无法打开",
+  "status.widgetUnavailableBody": "请稍后再试，或通过网站上的其他方式联系我们。",
 } as const;
 
 export type MessageKey = keyof typeof zhCN;
@@ -1471,6 +1487,25 @@ export const en: Record<MessageKey, string> = {
   "workbench.aiTools": "Tools",
   "workbench.aiKnowledge": "Knowledge",
   "widget.aiLabel": "AI assistant",
+  "status.notFoundTitle": "Page not found",
+  "status.notFoundBody":
+    "The address may be mistyped, or the page has been moved or removed.",
+  "status.errorTitle": "Something went wrong",
+  "status.errorBody":
+    "This page failed to load. Try again, and if the problem keeps happening, contact the site administrator.",
+  "status.errorId": "Error ID {id}",
+  "status.toConsole": "Go to console",
+  "status.sectionNotFoundTitle": "This page or record doesn't exist",
+  "status.sectionNotFoundBody":
+    "It may have been deleted, or this account isn't allowed to view it.",
+  "status.sectionErrorTitle": "This section couldn't load",
+  "status.sectionErrorBody":
+    "Try again, and if the problem keeps happening, contact your system administrator.",
+  "status.backToOverview": "Back to overview",
+  "status.backToWorkbench": "Back to workbench",
+  "status.widgetUnavailableTitle": "Chat is unavailable right now",
+  "status.widgetUnavailableBody":
+    "Please try again later, or reach us another way on this site.",
 };
 
 export const dictionaries = {
