@@ -13,6 +13,7 @@ import {
   WifiOff,
 } from "lucide-react";
 
+import { BrandMark } from "@/components/brand-mark";
 import { DueFollowUps } from "@/components/follow-ups/due-follow-ups";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useT } from "@/components/locale-provider";
@@ -71,11 +72,9 @@ export function WorkbenchHeader({
         : "bg-zinc-400";
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+    <header className="surface-ink bg-sidebar text-sidebar-foreground flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <div className="flex items-center gap-2">
-        <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md text-[11px] font-bold">
-          B
-        </div>
+        <BrandMark className="size-6" />
         <span className="hidden text-sm font-semibold tracking-tight sm:inline">
           {t("nav.agentTitle")}
         </span>
@@ -84,7 +83,7 @@ export function WorkbenchHeader({
       <span
         className={cn(
           "text-muted-foreground ml-2 inline-flex items-center gap-1 text-[11px]",
-          connected ? "text-muted-foreground" : "text-amber-600",
+          connected ? "text-muted-foreground" : "text-amber-400",
         )}
         title={
           connected

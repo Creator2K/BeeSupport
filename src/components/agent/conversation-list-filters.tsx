@@ -57,7 +57,7 @@ export function ConversationListFilters({
           >
             {tab.label}
             {tab.badge ? (
-              <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-[10px] tabular-nums">
+              <span className="bg-brand text-brand-foreground rounded-full px-1.5 text-[10px] font-semibold tabular-nums">
                 {tab.badge}
               </span>
             ) : null}

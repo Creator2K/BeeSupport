@@ -28,7 +28,9 @@ export function ConversationListItem({
       onClick={() => onSelect(conversation.id)}
       className={cn(
         "animate-rise flex w-full items-start gap-2.5 border-b px-3 py-2.5 text-left transition-colors duration-150",
-        active ? "bg-accent" : "hover:bg-accent/50",
+        active
+          ? "bg-accent shadow-[inset_3px_0_0_0_var(--brand)]"
+          : "hover:bg-accent/50",
       )}
     >
       <span className="relative mt-0.5">
@@ -55,7 +57,7 @@ export function ConversationListItem({
             {conversation.lastMessagePreview || "—"}
           </span>
           {conversation.unreadForAgent > 0 ? (
-            <span className="bg-primary text-primary-foreground shrink-0 rounded-full px-1.5 text-[10px] tabular-nums">
+            <span className="bg-brand text-brand-foreground shrink-0 rounded-full px-1.5 text-[10px] font-semibold tabular-nums">
               {conversation.unreadForAgent}
             </span>
           ) : null}

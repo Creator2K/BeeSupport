@@ -86,14 +86,14 @@ export function MessageBubble({
       <div className={cn("max-w-[82%] space-y-1 sm:max-w-[70%]")}>
         <div
           className={cn(
-            "rounded-xl px-3 py-2 text-sm shadow-xs",
+            "rounded-2xl px-3.5 py-2 text-sm shadow-xs",
             isNote
               ? "border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
               : isAi
                 ? "border border-foreground/10 bg-foreground/[0.04] text-foreground"
                 : mine
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground",
+                  ? "bg-bubble text-bubble-foreground"
+                  : "bg-card text-foreground border",
           )}
         >
           {isNote ? (

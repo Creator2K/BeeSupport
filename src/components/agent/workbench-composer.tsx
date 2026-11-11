@@ -97,7 +97,7 @@ export function WorkbenchComposer({
   const t = useT();
 
   return (
-    <div className="shrink-0 border-t p-3">
+    <div className="bg-card shrink-0 border-t p-3">
       {newMessagesBelow ? (
         <Button
           className="mb-2 w-full"

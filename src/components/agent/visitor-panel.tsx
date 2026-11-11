@@ -128,7 +128,7 @@ export function VisitorPanel({
   }
 
   return (
-    <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-l lg:flex">
+    <aside className="bg-card hidden w-72 shrink-0 flex-col overflow-y-auto border-l lg:flex">
       <div className="flex items-center justify-between border-b px-3 py-2.5">
         <h2 className="text-sm font-medium">{t("workbench.visitorInfo")}</h2>
       </div>

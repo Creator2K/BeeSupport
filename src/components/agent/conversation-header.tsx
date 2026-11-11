@@ -42,7 +42,7 @@ export function ConversationHeader({
   const t = useT();
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+    <div className="bg-card flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <Button
         variant="ghost"
         size="icon-sm"

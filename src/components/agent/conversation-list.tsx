@@ -50,7 +50,7 @@ export function ConversationList({
   const visible = filterConversations(conversations, filters, meId);
 
   return (
-    <div className="flex h-full w-full flex-col border-r sm:w-80">
+    <div className="bg-card flex h-full w-full flex-col border-r sm:w-80">
       <ConversationListFilters
         filters={filters}
         onFiltersChange={onFiltersChange}
