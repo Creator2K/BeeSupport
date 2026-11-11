@@ -9,3 +9,8 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+
+overrides:
+  # Next 15 pins postcss 8.4.31, which has published advisories fixed in 8.5.23.
+  # Remove once the installed Next release depends on a fixed version.
+  "postcss@<8.5.23": "^8.5.32"
