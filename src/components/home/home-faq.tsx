@@ -5,7 +5,7 @@ import styles from "./home.module.css";
 export function HomeFaq({ faqs }: { faqs: HomeContent["faqs"] }) {
   return (
     <section id="faq" className={`${styles.container} ${styles.faqSection}`}>
-      <div>
+      <div data-reveal="blur">
         <p className={styles.eyebrow}>GOOD TO KNOW</p>
         <h2 className={styles.sectionTitle}>你可能还想了解。</h2>
         <p className={styles.sectionText}>
@@ -14,7 +14,7 @@ export function HomeFaq({ faqs }: { faqs: HomeContent["faqs"] }) {
       </div>
       <div className={styles.faqList}>
         {faqs.map(({ question, answer }, index) => (
-          <details key={index}>
+          <details key={index} data-reveal>
             <summary>
               {question}
               <span aria-hidden="true">＋</span>

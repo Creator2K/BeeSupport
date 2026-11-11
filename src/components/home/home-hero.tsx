@@ -14,18 +14,19 @@ export function HomeHero({
   secondaryAnchor: string;
 }) {
   return (
-    <div className={`${styles.heroBand} pattern-hex`}>
+    <div className={`${styles.heroBand} pattern-hex`} data-pointer-field>
       <section className={`${styles.container} ${styles.hero}`}>
         <div className={styles.heroCopy}>
           <p className={styles.heroEyebrow}>
             <span /> {content.heroEyebrow}
           </p>
           <h1>
-            {content.titleLine1}
-            <br />
-            {content.titleLine2}
-            <span className={styles.heroUnderline}>
-              {content.titleHighlight}
+            <span className={styles.heroLine}>{content.titleLine1}</span>
+            <span className={styles.heroLine}>
+              {content.titleLine2}
+              <span className={styles.heroUnderline}>
+                {content.titleHighlight}
+              </span>
             </span>
           </h1>
           <p className={styles.heroText}>{content.heroDescription}</p>

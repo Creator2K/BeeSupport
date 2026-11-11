@@ -9,14 +9,23 @@ export function HomePlans({ plans }: { plans: PublicHomePlan[] }) {
   if (plans.length === 0) return null;
   return (
     <section id="plans" className={`${styles.container} ${styles.section}`}>
-      <p className={styles.eyebrow}>PLANS FOR YOUR TEAM</p>
-      <h2 className={styles.sectionTitle}>选择适合团队的服务。</h2>
-      <p className={styles.sectionText}>
+      <p className={styles.eyebrow} data-reveal>
+        PLANS FOR YOUR TEAM
+      </p>
+      <h2 className={styles.sectionTitle} data-reveal="blur">
+        选择适合团队的服务。
+      </h2>
+      <p className={styles.sectionText} data-reveal>
         按业务规模选择套餐，入驻审核后在后台提交订单，由平台核对收款并开通。
       </p>
       <div className={styles.planGrid}>
         {plans.map((plan) => (
-          <article key={plan.id} className={styles.planCard}>
+          <article
+            key={plan.id}
+            className={styles.planCard}
+            data-reveal
+            data-spotlight
+          >
             <h3>{plan.name}</h3>
             <p>{plan.description}</p>
             <div className={styles.planPrice}>

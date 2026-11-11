@@ -9,6 +9,7 @@ import { HomeFaq } from "./home-faq";
 import { HomeFeatures } from "./home-features";
 import { HomeHeader } from "./home-header";
 import { HomeHero } from "./home-hero";
+import { HomeMotion } from "./home-motion";
 import { HomePlans } from "./home-plans";
 import { HomeSteps } from "./home-steps";
 import styles from "./home.module.css";
@@ -51,13 +52,15 @@ export function HomeView({
         <HomePlans plans={plans} />
         <section className={`${styles.closing} pattern-hex`}>
           <div className={styles.container}>
-            <p className={styles.eyebrow}>LET’S TALK BETTER</p>
-            <h2>{content.closingTitle}</h2>
-            <Link href="/register" className={styles.limeButton}>
+            <p className={styles.eyebrow} data-reveal>
+              LET’S TALK BETTER
+            </p>
+            <h2 data-reveal="blur">{content.closingTitle}</h2>
+            <Link href="/register" className={styles.limeButton} data-reveal>
               申请入驻 {content.brandName}{" "}
               <ArrowUpRight size={20} aria-hidden="true" />
             </Link>
-            <p>
+            <p data-reveal>
               已有账号？
               <Link href="/login">
                 登录控制台 <ArrowRight size={14} aria-hidden="true" />
@@ -87,6 +90,7 @@ export function HomeView({
           © {new Date().getFullYear()} {content.brandName}
         </span>
       </footer>
+      <HomeMotion />
     </div>
   );
 }

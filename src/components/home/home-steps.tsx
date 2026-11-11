@@ -4,10 +4,14 @@ export function HomeSteps({ enabled }: { enabled: boolean }) {
   if (!enabled) return null;
   return (
     <section id="start" className={`${styles.container} ${styles.section}`}>
-      <p className={styles.eyebrow}>A SIMPLE START</p>
+      <p className={styles.eyebrow} data-reveal>
+        A SIMPLE START
+      </p>
       <div className={styles.sectionHeading}>
-        <h2 className={styles.sectionTitle}>从这里，开始连接。</h2>
-        <p className={styles.sectionText}>
+        <h2 className={styles.sectionTitle} data-reveal="blur">
+          从这里，开始连接。
+        </h2>
+        <p className={styles.sectionText} data-reveal>
           配置好你的空间，把精力留给服务。
         </p>
       </div>
@@ -29,7 +33,7 @@ export function HomeSteps({ enabled }: { enabled: boolean }) {
             "将嵌入代码加入网站。在工作台统一接待，持续查看会话和访客趋势。",
           ],
         ].map(([number, title, text]) => (
-          <article key={number}>
+          <article key={number} data-reveal>
             <span>{number}</span>
             <h3>{title}</h3>
             <p>{text}</p>

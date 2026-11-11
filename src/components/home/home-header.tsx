@@ -8,7 +8,7 @@ import styles from "./home.module.css";
 
 export function HomeHeader({ content }: { content: HomeContent }) {
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-scroll-progress>
       <div className={styles.navInner}>
         <Link
           href="/"

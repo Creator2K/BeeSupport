@@ -30,7 +30,7 @@ export function HomeFeatures({ content }: { content: HomeContent }) {
   return (
     <section id="features" className={`${styles.container} ${styles.section}`}>
       <div className={styles.sectionHeading}>
-        <div>
+        <div data-reveal="blur">
           <p className={styles.eyebrow}>BUILT FOR YOUR TEAM</p>
           <h2 className={styles.sectionTitle}>
             从一次对话，
@@ -38,7 +38,7 @@ export function HomeFeatures({ content }: { content: HomeContent }) {
             到一整套服务。
           </h2>
         </div>
-        <p className={styles.sectionText}>
+        <p className={styles.sectionText} data-reveal>
           让访客更容易找到你，让客服更从容地回应。
           <br />
           日常接待与商家运营，都有清楚的位置。
@@ -46,7 +46,12 @@ export function HomeFeatures({ content }: { content: HomeContent }) {
       </div>
       <div className={styles.featureGrid}>
         {features.map((feature, index) => (
-          <article key={index} className={styles.featureCard}>
+          <article
+            key={index}
+            className={styles.featureCard}
+            data-reveal
+            data-spotlight
+          >
             <span className={styles.featureIcon}>
               <feature.icon size={23} strokeWidth={1.6} aria-hidden="true" />
             </span>

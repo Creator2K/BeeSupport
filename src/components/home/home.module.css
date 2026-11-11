@@ -233,9 +233,20 @@
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
+.heroLine {
+  display: block;
+}
 .heroUnderline {
   color: var(--honey);
   text-shadow: 0 0 42px oklch(0.8 0.145 82 / 35%);
+  background: linear-gradient(
+      90deg,
+      oklch(0.8 0.145 82 / 75%),
+      oklch(0.8 0.145 82 / 8%)
+    )
+    no-repeat 0 96% / 100% 0.09em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .heroText {
   max-width: 520px;
@@ -329,13 +340,18 @@
 }
 
 /* ---------- 首屏右侧：工作台示意 ---------- */
+/* 外层只管布局和背后的光晕；卡片本身在 .sceneCard，入场和视差的 transform 只加在内层，
+   否则外层形成层叠上下文，::before 的光晕会盖到白色卡片上 */
 .scene {
   position: relative;
   min-width: 0;
   margin-bottom: 72px;
+  color: var(--ink);
+}
+.sceneCard {
+  position: relative;
   border-radius: 22px;
   background: var(--surface);
-  color: var(--ink);
   box-shadow:
     0 0 0 1px oklch(1 0 0 / 12%),
     0 0 0 10px oklch(1 0 0 / 4%),
@@ -1783,6 +1799,8 @@
   }
   .scene {
     margin-bottom: 64px;
+  }
+  .sceneCard {
     border-radius: 18px;
   }
   .sceneTop {
@@ -1924,6 +1942,615 @@
     display: none;
   }
 }
+
+/* ---------- 动效 ----------
+   只动 opacity / transform / filter：入场不做横向位移，窄屏不会出现横向滚动；
+   循环动画只放在纯装饰元素上，可点的元素保持静止（自动化测试要等元素停稳才点击）。
+   --px / --py、--mx / --my、--progress 和 data-revealed 由 home-motion.tsx 写入。 */
+
+/* 顶栏底部的阅读进度 */
+.header::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, oklch(0.8 0.145 82 / 30%), var(--honey));
+  box-shadow: 0 0 12px oklch(0.8 0.145 82 / 50%);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+/* 首屏：光晕随指针缓慢漂移，工作台与浮卡做两层视差 */
+.heroBand::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: -24%;
+  right: -14%;
+  width: min(880px, 96vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    oklch(0.8 0.145 82 / 16%),
+    transparent
+  );
+  pointer-events: none;
+  translate: calc(var(--px, 0) * -36px) calc(var(--py, 0) * -26px);
+  transition: translate 1.6s var(--spring);
+}
+.sceneCard {
+  translate: calc(var(--px, 0) * -10px) calc(var(--py, 0) * -8px);
+  transition: translate 1.4s var(--spring);
+}
+.sceneFloat {
+  transform: translate3d(
+    calc(var(--px, 0) * 18px),
+    calc(var(--py, 0) * 12px),
+    0
+  );
+  transition: transform 1.4s var(--spring);
+}
+
+/* 主按钮悬停时扫过一道光 */
+.primaryButton,
+.limeButton,
+.smallButton {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.primaryButton::after,
+.limeButton::after,
+.smallButton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    oklch(1 0 0 / 38%) 50%,
+    transparent 70%
+  );
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+
+/* 卡片悬停：跟随指针的蜂蜜色光斑，六边形图标转到另一种朝向 */
+.featureCard,
+.planCard {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.featureCard::before,
+.planCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    360px circle at var(--mx, 50%) var(--my, -30%),
+    oklch(0.8 0.145 82 / 14%),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+.featureCard:hover::before,
+.planCard:hover::before {
+  opacity: 1;
+}
+.featureIcon {
+  transition:
+    background-color 0.25s,
+    color 0.25s,
+    transform 0.6s var(--spring);
+}
+.featureIcon svg {
+  transition: transform 0.6s var(--spring);
+}
+.featureCard:hover .featureIcon {
+  transform: rotate(30deg);
+}
+.featureCard:hover .featureIcon svg {
+  transform: rotate(-30deg);
+}
+
+/* 演示悬浮按钮：换样式或颜色时这一层重新挂载，播放一次弹出 */
+.launcherSwap {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 演示客服的回复先以「正在输入」的小气泡出现，再展开成完整消息；
+   三个点平时透明，只在 typingDots 播放时可见 */
+.agentMessage {
+  position: relative;
+}
+.agentMessage::after {
+  content: "";
+  position: absolute;
+  top: 17px;
+  left: 16px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: oklch(0.6 0.02 80);
+  box-shadow:
+    8px 0 oklch(0.6 0.02 80),
+    16px 0 oklch(0.6 0.02 80);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 收尾区：缓慢呼吸的光晕 */
+.closing::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  bottom: -62%;
+  left: 50%;
+  width: min(1100px, 130vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    oklch(0.8 0.145 82 / 15%),
+    transparent
+  );
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+/* 错峰：同时进入视口的元素依次出现 */
+.sectionHeading > [data-reveal] + [data-reveal],
+.sectionTitle + .sectionText[data-reveal] {
+  --reveal-delay: 140ms;
+}
+.eyebrow[data-reveal] + .sectionTitle[data-reveal] {
+  --reveal-delay: 70ms;
+}
+.featureGrid > :nth-child(3n + 2),
+.planGrid > :nth-child(3n + 2) {
+  --reveal-delay: 90ms;
+}
+.featureGrid > :nth-child(3n),
+.planGrid > :nth-child(3n) {
+  --reveal-delay: 180ms;
+}
+.steps > :nth-child(2) {
+  --reveal-delay: 450ms;
+}
+.steps > :nth-child(3) {
+  --reveal-delay: 900ms;
+}
+.faqList > :nth-child(2) {
+  --reveal-delay: 70ms;
+}
+.faqList > :nth-child(3) {
+  --reveal-delay: 140ms;
+}
+.faqList > :nth-child(n + 4) {
+  --reveal-delay: 210ms;
+}
+.appearanceGrid > div:first-child > :nth-child(2) {
+  --reveal-delay: 80ms;
+}
+.appearanceGrid > div:first-child > :nth-child(3) {
+  --reveal-delay: 160ms;
+}
+.appearanceGrid > div:first-child > :nth-child(n + 4) {
+  --reveal-delay: 240ms;
+}
+.closing .container > :nth-child(2) {
+  --reveal-delay: 100ms;
+}
+.closing .container > :nth-child(3) {
+  --reveal-delay: 220ms;
+}
+.closing .container > :nth-child(4) {
+  --reveal-delay: 320ms;
+}
+@media (max-width: 900px) {
+  .featureGrid > :nth-child(n),
+  .planGrid > :nth-child(n),
+  .steps > :nth-child(n) {
+    --reveal-delay: 0ms;
+  }
+  .featureGrid > :nth-child(2n),
+  .planGrid > :nth-child(2n) {
+    --reveal-delay: 90ms;
+  }
+}
+@media (max-width: 560px) {
+  .featureGrid > :nth-child(n),
+  .planGrid > :nth-child(n) {
+    --reveal-delay: 0ms;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 首屏：按阅读顺序依次入场 */
+  .header {
+    animation: dropIn 0.8s var(--spring) backwards;
+  }
+  .heroEyebrow {
+    animation: rise 0.9s var(--spring) 0.1s backwards;
+  }
+  .heroLine {
+    animation: blurUp 1.1s var(--spring) 0.18s backwards;
+  }
+  .heroLine + .heroLine {
+    animation-delay: 0.3s;
+  }
+  .heroUnderline {
+    animation: underline 1.2s var(--spring) 1.05s backwards;
+  }
+  .heroText {
+    animation: rise 1s var(--spring) 0.46s backwards;
+  }
+  .heroActions {
+    animation: rise 1s var(--spring) 0.58s backwards;
+  }
+  .heroChecks {
+    animation: rise 1s var(--spring) 0.7s backwards;
+  }
+  .statement {
+    animation: rise 1s var(--spring) 0.85s backwards;
+  }
+  .statementLine {
+    transform-origin: 0 50%;
+    animation: drawX 1.4s var(--spring) 1.25s backwards;
+  }
+  .heroBand::after {
+    animation: glowDrift 18s ease-in-out infinite alternate;
+  }
+  .heroEyebrow > span,
+  .sceneNote > span {
+    animation: ping 2.8s ease-out 1.6s infinite;
+  }
+
+  /* 工作台像屏幕一样立起来，对话一条条出现，浮卡轻轻漂浮 */
+  .scene::before {
+    animation: fadeIn 1.8s ease 0.5s backwards;
+  }
+  .sceneCard {
+    transform-origin: 50% 100%;
+    animation: sceneIn 1.3s var(--spring) 0.3s backwards;
+  }
+  .sceneMessages > * {
+    animation: messageIn 0.7s var(--spring) backwards;
+  }
+  .sceneMessages > :nth-child(1) {
+    animation-delay: 0.95s;
+  }
+  .sceneMessages > :nth-child(2) {
+    transform-origin: 0 100%;
+    animation-delay: 1.3s;
+  }
+  .sceneMessages > :nth-child(3) {
+    transform-origin: 100% 100%;
+    animation-delay: 2s;
+  }
+  .sceneMessages > :nth-child(4) {
+    transform-origin: 0 100%;
+    animation-delay: 2.7s;
+  }
+  .sceneMessages > :nth-child(5) {
+    animation-delay: 3.1s;
+  }
+  .sceneChatTop .inProgress::before {
+    --ping-color: oklch(0.5 0.11 70);
+    animation: ping 2.4s ease-out 2s infinite;
+  }
+  .sceneFloat {
+    animation:
+      floatIn 1s var(--spring) 1.05s backwards,
+      bob 7s ease-in-out 2.1s infinite;
+  }
+  .sceneNote {
+    animation: fadeIn 1s ease 1.5s backwards;
+  }
+
+  /* 滚动入场 */
+  .page [data-revealed="false"] {
+    opacity: 0;
+  }
+  .page [data-revealed="false"]:focus-within {
+    opacity: 1;
+  }
+  .page [data-revealed="true"] {
+    animation: rise 1s var(--spring) var(--reveal-delay, 0ms) backwards;
+  }
+  .page [data-revealed="true"][data-reveal="blur"] {
+    animation-name: blurUp;
+    animation-duration: 1.2s;
+  }
+  .page [data-revealed="true"][data-reveal="zoom"] {
+    animation-name: zoomIn;
+    animation-duration: 1.3s;
+  }
+
+  /* 接入步骤：六边形依次弹出，连线一段段画过去 */
+  .steps article[data-revealed="true"] > span {
+    animation: hexPop 0.9s var(--spring)
+      calc(var(--reveal-delay, 0ms) + 0.1s) backwards;
+  }
+  .steps article[data-revealed="true"]::after {
+    transform-origin: 0 50%;
+    animation: drawX 1s var(--spring) calc(var(--reveal-delay, 0ms) + 0.35s)
+      backwards;
+  }
+
+  /* 常见问题：答案展开时浮现 */
+  .faqList details[open] > p {
+    animation: riseSm 0.5s var(--spring) backwards;
+  }
+
+  /* 外观演示：按钮切换时弹一下、待机时轻轻发光；客服稍等片刻再回复 */
+  .launcherSwap {
+    animation: swapPop 0.55s var(--spring) backwards;
+  }
+  .demoLauncher[aria-expanded="false"] .launcherSwap > * {
+    animation: launcherGlow 3.6s ease-in-out 2s infinite;
+  }
+  .demoMessages > p {
+    animation: messageIn 0.55s var(--spring) backwards;
+  }
+  .demoMessages > .agentMessage {
+    transform-origin: 0 100%;
+  }
+  .demoMessages > .visitorMessage {
+    transform-origin: 100% 100%;
+  }
+  .visitorMessage + .agentMessage {
+    transform-origin: 0 0;
+    animation: typingReply 1.3s var(--spring) 0.15s backwards;
+  }
+  .visitorMessage + .agentMessage::after {
+    animation: typingDots 1.3s linear 0.15s backwards;
+  }
+  .demoArtwork > div {
+    animation: hexFloat 7s ease-in-out infinite;
+  }
+  .demoArtwork > div:nth-child(2) {
+    animation-delay: -2.4s;
+  }
+  .demoArtwork > div:nth-child(3) {
+    animation-delay: -4.8s;
+  }
+
+  /* 收尾区 */
+  .closing::after {
+    animation: breathe 10s ease-in-out infinite;
+  }
+  .closingArt {
+    animation: drift 16s ease-in-out infinite;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .primaryButton:hover::after,
+  .limeButton:hover::after,
+  .smallButton:hover::after {
+    animation: shine 0.9s var(--spring);
+  }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: no-preference) {
+  .steps article[data-revealed="true"]::after {
+    transform-origin: 50% 0;
+    animation-name: drawY;
+  }
+}
+/* 常见问题展开、收起时高度平滑变化；不支持 ::details-content 的浏览器直接切换 */
+@supports selector(::details-content) {
+  @media (prefers-reduced-motion: no-preference) {
+    .faqList details {
+      interpolate-size: allow-keywords;
+    }
+    .faqList details::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition:
+        block-size 0.45s var(--spring),
+        content-visibility 0.45s allow-discrete;
+    }
+    .faqList details[open]::details-content {
+      block-size: auto;
+    }
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+@keyframes riseSm {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes blurUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(12px);
+  }
+}
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.94);
+  }
+}
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sceneIn {
+  from {
+    opacity: 0;
+    transform: perspective(1600px) translateY(56px) rotateX(16deg) scale(0.95);
+  }
+}
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.92);
+  }
+}
+@keyframes bob {
+  50% {
+    translate: 0 -8px;
+  }
+}
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+}
+@keyframes underline {
+  from {
+    background-size: 0% 0.09em;
+  }
+}
+@keyframes typingReply {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+    clip-path: inset(
+      0 calc(100% - 54px) calc(100% - 39px) 0 round 4px 14px 14px 14px
+    );
+    color: transparent;
+  }
+  14%,
+  58% {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(
+      0 calc(100% - 54px) calc(100% - 39px) 0 round 4px 14px 14px 14px
+    );
+    color: transparent;
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 round 4px 14px 14px 14px);
+  }
+}
+@keyframes typingDots {
+  0%,
+  8% {
+    opacity: 0;
+  }
+  18%,
+  40% {
+    opacity: 1;
+  }
+  29%,
+  51% {
+    opacity: 0.35;
+  }
+  56% {
+    opacity: 1;
+  }
+  64%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes drawX {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes drawY {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes hexPop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-60deg);
+  }
+}
+@keyframes hexFloat {
+  50% {
+    translate: 0 -9px;
+  }
+}
+@keyframes swapPop {
+  from {
+    opacity: 0.4;
+    transform: scale(0.82);
+  }
+}
+@keyframes launcherGlow {
+  50% {
+    filter: drop-shadow(
+      0 0 14px color-mix(in oklab, var(--demo-color, #18181b) 55%, transparent)
+    );
+  }
+}
+@keyframes ping {
+  0% {
+    box-shadow: 0 0 0 0
+      color-mix(
+        in oklab,
+        var(--ping-color, oklch(0.8 0.145 82)) 55%,
+        transparent
+      );
+  }
+  75%,
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+@keyframes glowDrift {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate(-7%, 9%) scale(1.15);
+    opacity: 1;
+  }
+}
+@keyframes breathe {
+  50% {
+    transform: scale(1.14);
+    opacity: 0.7;
+  }
+}
+@keyframes drift {
+  50% {
+    translate: -16px -20px;
+    rotate: 9deg;
+  }
+}
+@keyframes shine {
+  to {
+    transform: translateX(130%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page * {
     transition: none !important;

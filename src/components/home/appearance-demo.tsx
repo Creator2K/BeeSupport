@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUp, Check, MessageCircleMore, X } from "lucide-react";
 import { LauncherPreview } from "@/components/widget/launcher-preview";
 import { launcherStyleOptions, type LauncherStyle } from "@/lib/launcher";
@@ -49,19 +49,22 @@ export function AppearanceDemo() {
   return (
     <div className={styles.appearanceGrid}>
       <div>
-        <p className={styles.eyebrow}>MAKE IT YOURS</p>
-        <h2 className={styles.sectionTitle}>
+        <p className={styles.eyebrow} data-reveal>
+          MAKE IT YOURS
+        </p>
+        <h2 className={styles.sectionTitle} data-reveal="blur">
           是客服入口，
           <br />
           也是你的品牌。
         </h2>
-        <p className={styles.sectionText}>
+        <p className={styles.sectionText} data-reveal>
           选择一种喜欢的样式，再换个颜色。小小的悬浮按钮，也能自然融入你的网站。
         </p>
         <div
           role="group"
           aria-label="体验悬浮按钮样式"
           className={styles.styleOptions}
+          data-reveal
         >
           {launcherStyleOptions.map((option) => (
             <button
@@ -79,6 +82,7 @@ export function AppearanceDemo() {
           role="group"
           aria-label="体验品牌颜色"
           className={styles.colorOptions}
+          data-reveal
         >
           {colors.map((option) => (
             <button
@@ -102,7 +106,11 @@ export function AppearanceDemo() {
           <span>随心选色，适配品牌</span>
         </div>
       </div>
-      <div className={styles.demoBrowser} data-testid="appearance-demo">
+      <div
+        className={styles.demoBrowser}
+        data-testid="appearance-demo"
+        data-reveal="zoom"
+      >
         <div className={styles.browserBar}>
           <span className={styles.browserDots} aria-hidden="true">
             <i />
@@ -209,13 +217,16 @@ export function AppearanceDemo() {
             aria-expanded={open}
             aria-controls="home-demo-chat"
             onClick={() => setOpen((previous) => !previous)}
+            style={{ "--demo-color": color } as CSSProperties}
           >
-            <LauncherPreview
-              style={kind}
-              color={color}
-              label="聊一聊"
-              open={open}
-            />
+            <span key={`${kind}-${color}`} className={styles.launcherSwap}>
+              <LauncherPreview
+                style={kind}
+                color={color}
+                label="聊一聊"
+                open={open}
+              />
+            </span>
           </button>
         </div>
         <p className={styles.demoCaption}>
