@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import bcrypt from "bcryptjs";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase } from "./test-environment.mjs";
 useTestDatabase();
 if (!process.env.TEST_APP_URL) throw Error("Select authorized TEST_APP_URL");
@@ -75,14 +76,7 @@ async function login(context, user, pass = password) {
   });
 }
 async function axe(p = page) {
-  await p.evaluate(async () => {
-    await Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-        .map((a) => a.finished.catch(() => {})),
-    );
-  });
+  await waitForSettledPage(p);
   const scan = await new AxeBuilder({ page: p })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();

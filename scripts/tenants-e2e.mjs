@@ -166,7 +166,9 @@ try {
   page = await merchant.newPage();
   for (const p of [adminPage, page]) {
     p.setDefaultTimeout(12000);
-    p.on("pageerror", (error) => errors.push(error.message));
+    p.on("pageerror", (error) =>
+      errors.push(`${new URL(p.url()).pathname}: ${error.message}`),
+    );
   }
   await assertStatus(
     await platform.request.post(`${APP}/api/auth/login`, {
@@ -515,7 +517,9 @@ try {
     await dialog
       .getByLabel("话术内容", { exact: true })
       .fill("平台替商家 B 配置的专属回复");
-    await dialog.getByRole("combobox").click();
+    await dialog
+      .getByRole("combobox", { name: "适用范围", exact: true })
+      .click();
     await adminPage.getByRole("option", { name: sb.name, exact: true }).click();
     await dialog.getByRole("button", { name: "保存", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });

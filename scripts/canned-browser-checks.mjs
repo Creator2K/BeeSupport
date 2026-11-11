@@ -120,7 +120,9 @@ export async function runCannedChecks({
   const agentPage = await context.newPage();
   agentPage.setDefaultTimeout(15000);
   const errors = [];
-  agentPage.on("pageerror", (error) => errors.push(error.message));
+  agentPage.on("pageerror", (error) =>
+    errors.push(`${new URL(agentPage.url()).pathname}: ${error.message}`),
+  );
   const list = (p, siteId) =>
     p.request.get(`${APP}/api/agent/canned?${new URLSearchParams({ siteId })}`);
   const use = (id, siteId = site.id) =>

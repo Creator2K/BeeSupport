@@ -5,6 +5,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import bcrypt from "bcryptjs";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase, restoreSetting } from "./test-environment.mjs";
 useTestDatabase();
 if (!process.env.TEST_APP_URL)
@@ -59,14 +60,7 @@ async function test(name, run) {
   }
 }
 async function settle(p = page) {
-  await p.evaluate(async () => {
-    await Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-        .map((a) => a.finished.catch(() => {})),
-    );
-  });
+  await waitForSettledPage(p);
 }
 async function axe(p = page) {
   await settle(p);
@@ -298,8 +292,12 @@ try {
       await merchantPage.getByRole("progressbar").getAttribute("aria-valuenow"),
       "2",
     );
-    await page.goto(APP);
-    await page.evaluate((key) => {
+    // 真实宿主和后台不同站，浏览器会按顶级站点隔离小组件的存储；首页和预览同站，
+    // 所以换一个干净的上下文，免得沿用试聊留下的访客身份（有身份时只上报轨迹，不算接入）。
+    const host = await browser.newContext({ locale: "zh-CN" });
+    const hostPage = await newPage(host);
+    await hostPage.goto(APP);
+    await hostPage.evaluate((key) => {
       const script = document.createElement("script");
       script.src = `/widget.js?key=${encodeURIComponent(key)}`;
       document.body.appendChild(script);
@@ -312,6 +310,7 @@ try {
         ),
       "real host installation report",
     );
+    await host.close();
     await merchantPage
       .getByRole("button", { name: "刷新接入状态", exact: true })
       .click();

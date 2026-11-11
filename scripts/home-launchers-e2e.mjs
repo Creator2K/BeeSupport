@@ -5,6 +5,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 import bcrypt from "bcryptjs";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase } from "./test-environment.mjs";
 
 useTestDatabase();
@@ -62,14 +63,7 @@ async function test(name, run) {
   }
 }
 async function settle() {
-  await page.evaluate(async () => {
-    await Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-        .map((a) => a.finished.catch(() => {})),
-    );
-  });
+  await waitForSettledPage(page);
 }
 async function noOverflow() {
   const size = await page.evaluate(() => ({

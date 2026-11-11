@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase } from "./test-environment.mjs";
 
 useTestDatabase();
@@ -23,14 +24,7 @@ async function check(name, run) {
   console.log(`PASS: ${name}`);
 }
 async function settle(page) {
-  await page.evaluate(async () => {
-    await Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-        .map((a) => a.finished.catch(() => {})),
-    );
-  });
+  await waitForSettledPage(page);
 }
 async function login(context, email, status = 200, pass = password) {
   const response = await context.request.post(`${app}/api/auth/login`, {

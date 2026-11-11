@@ -44,7 +44,9 @@ async function main() {
   const page = await ctx.newPage();
   page.setDefaultTimeout(8000);
   const browserErrors = [];
-  page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("pageerror", (error) =>
+    browserErrors.push(`${new URL(page.url()).pathname}: ${error.message}`),
+  );
 
   const fixtures = {};
   for (const label of ["A", "B"]) {
@@ -281,13 +283,11 @@ async function main() {
   await test("话术只展示全局及当前站点内容", async () => {
     await chat(fixtures.B.id);
     await page.getByRole("button", { name: "快捷话术", exact: true }).click();
+    // 列表是打开后才加载的：先等全局话术出现，再确认 A 站的没有混进来
+    await page.getByText(`全局话术 ${stamp}`, { exact: true }).waitFor();
     assert.equal(
       await page.getByText(`A 专属 ${stamp}`, { exact: true }).count(),
       0,
-    );
-    assert.equal(
-      await page.getByText(`全局话术 ${stamp}`, { exact: true }).isVisible(),
-      true,
     );
   });
   await test("在线状态请求失败保留服务端状态", async () => {

@@ -58,7 +58,9 @@ export async function runUnansweredChecks({
   const agentContext = await browser.newContext(),
     agentPage = await agentContext.newPage(),
     errors = [];
-  agentPage.on("pageerror", (error) => errors.push(error.message));
+  agentPage.on("pageerror", (error) =>
+    errors.push(`${new URL(agentPage.url()).pathname}: ${error.message}`),
+  );
   assert.equal(
     (
       await agentContext.request.post(`${APP}/api/auth/login`, {

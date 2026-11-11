@@ -155,7 +155,9 @@ export async function runFollowUpChecks({
   const agentPage = await agentContext.newPage();
   agentPage.setDefaultTimeout(15000);
   const errors = [];
-  agentPage.on("pageerror", (error) => errors.push(error.message));
+  agentPage.on("pageerror", (error) =>
+    errors.push(`${new URL(agentPage.url()).pathname}: ${error.message}`),
+  );
   const endpoint = (conversation) =>
     `${APP}/api/agent/conversations/${conversation.id}/follow-up`;
   const post = (context, conversation, data) =>

@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import bcrypt from "bcryptjs";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase, restoreSetting } from "./test-environment.mjs";
 useTestDatabase();
 if (!process.env.TEST_APP_URL)
@@ -59,14 +60,7 @@ async function test(name, run) {
   }
 }
 async function axe(p = page) {
-  await p.evaluate(async () => {
-    await Promise.all(
-      document
-        .getAnimations()
-        .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-        .map((a) => a.finished.catch(() => {})),
-    );
-  });
+  await waitForSettledPage(p);
   const result = await new AxeBuilder({ page: p })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
@@ -88,7 +82,9 @@ async function axe(p = page) {
 async function makePage(context) {
   const p = await context.newPage();
   p.setDefaultTimeout(20000);
-  p.on("pageerror", (error) => errors.push(error.message));
+  p.on("pageerror", (error) =>
+    errors.push(`${new URL(p.url()).pathname}: ${error.message}`),
+  );
   p.on("response", (response) => {
     if (response.status() >= 400 && response.url().includes("/_next/"))
       errors.push(`Asset ${response.status()} ${response.url()}`);

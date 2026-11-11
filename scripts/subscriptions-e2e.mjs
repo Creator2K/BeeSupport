@@ -5,6 +5,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import bcrypt from "bcryptjs";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase } from "./test-environment.mjs";
 useTestDatabase();
 if (!process.env.TEST_APP_URL) throw new Error("TEST_APP_URL is required");
@@ -128,7 +129,9 @@ try {
   page = await merchant.newPage();
   for (const p of [adminPage, page]) {
     p.setDefaultTimeout(15000);
-    p.on("pageerror", (error) => errors.push(error.message));
+    p.on("pageerror", (error) =>
+      errors.push(`${new URL(p.url()).pathname}: ${error.message}`),
+    );
   }
   await test("平台创建并发布真实可选套餐，金额按分保存", async () => {
     await adminPage.goto(`${APP}${ADMIN}/plans`);
@@ -400,14 +403,7 @@ try {
           ),
           false,
         );
-        await p.evaluate(async () => {
-          await Promise.all(
-            document
-              .getAnimations()
-              .filter((a) => Number.isFinite(a.effect?.getTiming().iterations))
-              .map((a) => a.finished.catch(() => {})),
-          );
-        });
+        await waitForSettledPage(p);
         const scan = await new AxeBuilder({ page: p })
           .withTags(["wcag2a", "wcag2aa"])
           .analyze();
