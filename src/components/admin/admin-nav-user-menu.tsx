@@ -61,7 +61,7 @@ export function AdminNavUserMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={`${user.name} ? ${t("nav.accountSettings")}`}
+          aria-label={`${user.name} · ${t("nav.accountSettings")}`}
           title={user.name}
           className={cn(
             "hover:bg-sidebar-accent focus-visible:ring-ring flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",

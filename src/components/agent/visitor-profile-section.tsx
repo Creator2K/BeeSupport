@@ -188,7 +188,7 @@ export function VisitorProfileSection({
             label={t("workbench.locale")}
             value={[readMeta("locale"), readMeta("languages")]
               .filter(Boolean)
-              .join(" ? ")}
+              .join(" · ")}
           />
         ) : null}
         {readMeta("timezone") ? (
@@ -221,7 +221,7 @@ export function VisitorProfileSection({
               readMeta("memory") ? `${readMeta("memory")}GB 内存` : null,
             ]
               .filter(Boolean)
-              .join(" ? ")}
+              .join(" · ")}
           />
         ) : null}
         {readMeta("ip") ? (

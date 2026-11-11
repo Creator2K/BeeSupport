@@ -121,7 +121,7 @@ export function AdminNavGroups({
                       aria-current={active ? "page" : undefined}
                       title={
                         count
-                          ? `${label} ? ${t("nav.pendingCount", { count })}`
+                          ? `${label} · ${t("nav.pendingCount", { count })}`
                           : label
                       }
                       className={cn(
