@@ -1,0 +1,8 @@
+# Separate, on-demand recovery tools; the application image stays unchanged.
+FROM postgres:17-alpine
+RUN apk add --no-cache nodejs
+WORKDIR /ops
+COPY scripts/recovery.mjs ./recovery.mjs
+COPY scripts/recovery ./recovery
+ENTRYPOINT ["node", "/ops/recovery.mjs"]
+CMD ["--help"]

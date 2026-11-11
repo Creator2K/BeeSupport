@@ -28,11 +28,13 @@ import {
   type AiFormState,
   type KnowledgeDraft,
   type KnowledgeRecord,
+  type IndexStats,
 } from "./ai-types";
 
 export function useAiAdmin(
   config: AiFormState,
   entries: KnowledgeRecord[],
+  indexStats: IndexStats,
 ) {
   const t = useT();
   const router = useRouter();
@@ -53,6 +55,14 @@ export function useAiAdmin(
   useEffect(() => {
     setTestPrompt(t("ai.testDefaultPrompt"));
   }, [t]);
+
+  useEffect(() => {
+    if (!indexStats.pending && !indexStats.processing) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [indexStats.pending, indexStats.processing, router]);
 
   function update<K extends keyof AiFormState>(key: K, value: AiFormState[K]) {
     setForm((previous) => ({ ...previous, [key]: value }));
@@ -143,9 +153,8 @@ export function useAiAdmin(
     }
 
     toast.success(
-      t("ai.reindexDone", {
-        chunks: result.result?.chunks ?? 0,
-        embedded: result.result?.embedded ?? 0,
+      t("ai.reindexQueued", {
+        count: result.result?.queued ?? 0,
       }),
     );
     router.refresh();

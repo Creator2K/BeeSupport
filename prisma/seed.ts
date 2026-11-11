@@ -238,13 +238,10 @@ async function main() {
 
   // 知识库切片索引（关键词检索的最小单位），有向量配置时顺带写向量
   try {
-    const { rebuildKnowledgeIndex } =
+    const { requestKnowledgeIndex } =
       await import("../src/server/services/knowledge");
-    const index = await rebuildKnowledgeIndex();
-    console.log(
-      `✓ 知识库索引：${index.entries} 条 / ${index.chunks} 个切片` +
-        (index.vectorized ? `（已向量化 ${index.embedded}）` : ""),
-    );
+    const index = await requestKnowledgeIndex();
+    console.log(`✓ 已安排 ${index.queued} 条知识索引任务，启动服务后处理`);
   } catch (error) {
     console.warn(
       "! 知识库索引重建失败（可稍后在后台点「重建向量索引」）:",

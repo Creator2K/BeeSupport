@@ -22,7 +22,9 @@ function aiFixture() {
       body: "Question",
       authorName: null,
     },
-    lease: null,
+    lease: "token",
+    leaseExpiry: new Date(Date.now() + 60_000),
+    revision: 1,
     inserted: [],
     pending: [],
     modelCalls: 0,
@@ -36,16 +38,31 @@ function aiFixture() {
     enableTools: false,
   };
   const prisma = {
-    $queryRaw: async () => [],
+    $queryRaw: async (_query, ...values) => values[0] === "reply:c1" && values[1] === state.revision && values[2] === state.lease && state.leaseExpiry > new Date() ? [{ id: "reply:c1" }] : [],
     $transaction: async (callback) => callback(prisma),
+    aiJob: {
+      update: async () => ({}),
+      findFirst: async ({ where }) => where.id === "reply:c1" && where.revision === state.revision && where.leaseToken === state.lease && state.leaseExpiry > new Date() ? { id: "reply:c1" } : null,
+    },
     conversation: {
       findUnique: async () => ({
         id: "c1",
         siteId: "s1",
         visitorId: "visitor",
-        status: "OPEN",
+        status: state.status ?? "OPEN",
+        tags: [],
         aiReplyToken: state.lease,
-        site: { name: "Shop" },
+        aiReplyExpiresAt: state.leaseExpiry,
+        site: {
+          name: "Shop",
+          active: state.siteActive !== false,
+          tenant: {
+            status: state.tenantStatus ?? "ACTIVE",
+            expiresAt: state.tenantExpiry ?? null,
+            features: { ai: state.aiAllowed !== false, removeBranding: true, advancedAnalytics: true },
+          },
+        },
+        visitor: { blocked: state.blocked ?? false },
         messages: [state.latest],
       }),
       updateMany: async ({ where, data }) => {
@@ -53,6 +70,7 @@ function aiFixture() {
         if (where.aiReplyToken && where.aiReplyToken !== state.lease)
           return { count: 0 };
         state.lease = data.aiReplyToken;
+        state.leaseExpiry = data.aiReplyExpiresAt;
         return { count: 1 };
       },
       update: async () => ({}),
@@ -90,6 +108,28 @@ function aiFixture() {
         );
       },
     },
+    "./ai-policy": {
+      resolveAiPolicyForSite: async () => ({
+        tenantId: "t1",
+        siteName: "Shop",
+        policy: {
+          enabled: config.enabled && state.aiAllowed !== false,
+          config,
+          autoReply: config.autoReply,
+          allowMutations: true,
+          monthlyRequestLimit: null,
+          monthlyTokenLimit: null,
+          requestLimitScope: "tenant",
+          tokenLimitScope: "tenant",
+          concurrencyLimit: 2,
+          overLimitAction: "skip",
+        },
+      }),
+    },
+    "./ai-usage": {
+      checkAiQuota: async () => ({ ok: true }),
+      recordAiUsage: async () => {},
+    },
     "../../lib/auth": auth,
     "../../lib/db": { prisma },
     "../../lib/visitor-env": {},
@@ -106,14 +146,15 @@ function aiFixture() {
       await nextTurn();
     assert.equal(state.modelCalls, count);
   };
-  return { state, service: module(), module, waitForCalls };
+  const job = () => ({ id: "reply:c1", kind: "AUTO_REPLY", conversationId: "c1", messageId: state.latest.id, leaseToken: state.lease, revision: state.revision, attempts: 1 });
+  return { state, config, dependencies, service: module(), module, waitForCalls, job };
 }
 
 test("disabled plan AI blocks draft and automatic replies without calling the model", async () => {
-  const { state, service } = aiFixture();
+  const { state, service, job } = aiFixture();
   state.aiAllowed = false;
   assert.equal((await service.decideAutoReply("c1")).reply, false);
-  await service.maybeAutoReply("c1");
+  await service.processAutoReply(job());
   await assert.rejects(
     service.suggestAgentReply({
       user: { siteIds: ["s1"] },
@@ -124,31 +165,25 @@ test("disabled plan AI blocks draft and automatic replies without calling the mo
   assert.equal(state.modelCalls, 0);
 });
 test("an in-flight AI reply is discarded when the plan grant is revoked", async () => {
-  const { state, service, waitForCalls } = aiFixture();
-  const pending = service.maybeAutoReply("c1");
+  const { state, service, waitForCalls, job } = aiFixture();
+  const pending = service.processAutoReply(job());
   await waitForCalls(1);
   state.aiAllowed = false;
   state.pending.shift()();
   await pending;
   assert.equal(state.inserted.length, 0);
 });
-test("concurrent AI triggers across instances call the model once", async () => {
-  const { state, service, module, waitForCalls } = aiFixture();
-  const first = service.maybeAutoReply("c1");
-  const retry = service.maybeAutoReply("c1");
-  const otherInstance = module();
-  await otherInstance.maybeAutoReply("c1");
-  await waitForCalls(1);
-  state.pending.shift()();
-  await Promise.all([first, retry]);
-  assert.equal(state.modelCalls, 1);
-  assert.equal(state.inserted.length, 1);
-  assert.equal(state.lease, null);
+test("a worker whose lease was replaced cannot start model generation", async () => {
+  const { state, service, job } = aiFixture();
+  const stale = job();
+  state.lease = "new-owner";
+  assert.equal((await service.processAutoReply(stale)).status, "SKIPPED");
+  assert.equal(state.modelCalls, 0);
 });
 
 test("an AI response generated before a human reply is discarded", async () => {
-  const { state, service, waitForCalls } = aiFixture();
-  const pending = service.maybeAutoReply("c1");
+  const { state, service, waitForCalls, job } = aiFixture();
+  const pending = service.processAutoReply(job());
   await waitForCalls(1);
   state.latest = {
     id: "human",
@@ -163,8 +198,8 @@ test("an AI response generated before a human reply is discarded", async () => {
 });
 
 test("a newer visitor message supersedes an in-flight AI answer", async () => {
-  const { state, service, waitForCalls } = aiFixture();
-  const pending = service.maybeAutoReply("c1");
+  const { state, service, waitForCalls, job } = aiFixture();
+  const pending = service.processAutoReply(job());
   await waitForCalls(1);
   state.latest = {
     id: "v2",
@@ -172,13 +207,70 @@ test("a newer visitor message supersedes an in-flight AI answer", async () => {
     type: "TEXT",
     body: "Updated question",
   };
+  state.revision += 1;
   state.pending.shift()();
+  assert.equal((await pending).status, "SKIPPED");
+  const replacement = service.processAutoReply(job());
   await waitForCalls(2);
   assert.equal(state.inserted.length, 0);
   state.pending.shift()();
-  await pending;
+  await replacement;
   assert.equal(state.inserted.length, 1);
-  assert.equal(state.lease, null);
+});
+
+for (const [label, patch] of [
+  ["site disabled", { siteActive: false }],
+  ["tenant suspended", { tenantStatus: "SUSPENDED" }],
+  ["tenant expired", { tenantExpiry: new Date(0) }],
+  ["visitor blocked", { blocked: true }],
+  ["conversation closed", { status: "CLOSED" }],
+]) {
+  test(`AI discards in-flight answers and denies tools after ${label}`, async () => {
+    const { state, config, dependencies, service, waitForCalls, job } = aiFixture();
+    config.enableTools = true;
+    const pending = service.processAutoReply(job());
+    await waitForCalls(1);
+    Object.assign(state, patch);
+    const context = { conversationId: "c1", siteId: "s1", visitorId: "visitor", config: { ...config, enableTools: true }, allowMutations: true, expectedMessageId: "v1", leaseToken: state.lease, trace: [] };
+    const tools = dependencies["./ai-tools"];
+    for (const name of ["get_visitor_context", "tag_conversation", "escalate_to_human"]) {
+      assert.match(await tools.runTool(context, { name, arguments: '{"tags":["test"]}' }), /不可执行/);
+    }
+    state.pending.shift()();
+    await pending;
+    assert.equal(state.inserted.length, 0);
+    assert.equal(state.modelCalls, 1);
+  });
+}
+
+test("expired leases and mismatched associations cannot insert AI messages", async () => {
+  const { state, service } = aiFixture();
+  state.lease = "token";
+  state.leaseExpiry = new Date(0);
+  const input = { conversationId: "c1", siteId: "s1", body: "answer", authorName: "AI", leaseToken: "token", expectedMessageId: "v1" };
+  assert.equal(await service.insertAiMessage(input), null);
+  state.leaseExpiry = new Date(Date.now() + 60_000);
+  assert.equal(await service.insertAiMessage({ ...input, siteId: "another-site" }), null);
+  assert.equal(await service.insertAiMessage({ ...input, leaseToken: "old-token" }), null);
+  assert.equal(state.inserted.length, 0);
+});
+
+test("disabled AI blocks agent drafts before calling the model", async () => {
+  const { config, service, state } = aiFixture();
+  config.enabled = false;
+  await assert.rejects(service.suggestAgentReply({ user: { siteIds: ["s1"] }, conversationId: "c1" }), /启用/);
+  assert.equal(state.modelCalls, 0);
+});
+
+test("broadcast failure preserves the committed AI message and still attempts the other notification", async () => {
+  const { state, dependencies, module } = aiFixture();
+  let notified = false;
+  dependencies["./broadcast"].broadcastMessage = async () => { throw new Error("realtime offline"); };
+  dependencies["./broadcast"].broadcastConversation = async () => { notified = true; };
+  const id = await module().insertAiMessage({ conversationId: "c1", siteId: "s1", body: "answer", authorName: "AI" });
+  assert.equal(id, state.inserted[0].id);
+  assert.equal(notified, true);
+  assert.equal(state.inserted.length, 1);
 });
 
 async function socketFixture({ anonymous = false } = {}) {

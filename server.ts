@@ -20,6 +20,7 @@ import {
   runWithRequestContext,
 } from "./src/server/request-context";
 import { startNotificationWorker } from "./src/server/notification-worker";
+import { startAiWorker } from "./src/server/ai-worker";
 import { startSubscriptionReminderWorker } from "./src/server/services/subscription-reminders";
 import { startUnansweredReminderWorker } from "./src/server/services/unanswered";
 
@@ -130,6 +131,7 @@ async function main(): Promise<void> {
 
   registerRealtime(io);
   const stopNotifications = startNotificationWorker();
+  const stopAi = startAiWorker();
   const stopReminders = startSubscriptionReminderWorker();
   const stopUnanswered = startUnansweredReminderWorker();
   const expirePresence = () =>
@@ -172,6 +174,7 @@ async function main(): Promise<void> {
     try {
       await Promise.all([
         stopNotifications(),
+        stopAi(),
         stopReminders(),
         stopUnanswered(),
         new Promise<void>((resolve) => io.close(() => resolve())),

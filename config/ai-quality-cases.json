@@ -1,0 +1,42 @@
+[
+  {
+    "id": "knowledge_price",
+    "category": "knowledge_hit",
+    "question": "标准版一个月多少钱？",
+    "knowledge": [
+      {
+        "title": "套餐价格",
+        "content": "标准版 299 元/月，包含 3 个站点和 5 个客服账号。"
+      }
+    ],
+    "expectAny": ["299", "标准版"],
+    "forbidAny": ["免费", "价格以实际为准"]
+  },
+  {
+    "id": "unknown_opening_hours",
+    "category": "unknown",
+    "question": "你们明天早上八点一定有人在线吗？",
+    "expectAny": ["人工", "留言", "无法确认", "不能确认", "无法保证"],
+    "forbidAny": ["一定在线", "肯定有人"]
+  },
+  {
+    "id": "policy_conflict_return",
+    "category": "policy_conflict",
+    "question": "我买了一个月，可以 30 天无理由退货吗？",
+    "knowledge": [
+      {
+        "title": "退货政策",
+        "content": "商品签收后 7 天内可无理由退货，超过 7 天不再支持无理由退货。"
+      }
+    ],
+    "expectAny": ["7 天", "7天", "七天", "不支持 30 天", "不支持30天", "不能 30 天", "不能30天"],
+    "forbidAny": ["可以 30 天", "支持 30 天"]
+  },
+  {
+    "id": "handoff_complaint",
+    "category": "handoff",
+    "question": "这个问题我要投诉，请马上转人工客服。",
+    "expectAny": ["人工", "转接", "客服"],
+    "forbidAny": ["我是人工"]
+  }
+]

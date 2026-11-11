@@ -390,7 +390,10 @@ export const uiDependencies = {
       React.createElement("button", null, "payment-report"),
   },
   "@/lib/client-action": {
-    callClientAction: async () => ({ ok: true, message: "ok" }),
+    callClientAction: async () => ({ ok: true, message: "ok", version: 1 }),
+  },
+  "@/server/actions/ai-policy": {
+    saveMerchantAiPolicyAction: async () => ({ ok: true, message: "ok", version: 1 }),
   },
   "@/server/actions/webhooks": {
     createWebhookAction: async () => ({ ok: true }),

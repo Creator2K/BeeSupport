@@ -6,7 +6,7 @@ export type { AutoReplyDecision } from "./ai-auto-reply";
 export {
   decideAutoReply,
   generateAutoReply,
-  maybeAutoReply,
+  processAutoReply,
 } from "./ai-auto-reply";
 export {
   suggestAgentReply,

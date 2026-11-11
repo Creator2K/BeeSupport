@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { HttpError } from "../../lib/auth";
 import { lockConversation } from "../transactions";
 import { getWidgetSettings, tenantCanServe } from "./tenants";
+import { enqueueAiReply } from "./ai-job-queue";
 import {
   inferType,
   linkAttachments,
@@ -65,7 +66,7 @@ export async function writeMessage(
           name: true,
           imageReviewEnabled: true,
           active: true,
-          tenant: { select: { status: true, expiresAt: true } },
+          tenant: { select: { id: true, status: true, expiresAt: true } },
         },
       },
       visitor: { select: { email: true } },
@@ -173,6 +174,9 @@ export async function writeMessage(
     body,
     attachmentCount: attachmentIds.length,
   });
+
+  if (input.sender === "VISITOR")
+    await enqueueAiReply(tx, conversation.site.tenant.id, input.conversationId, message.id);
 
   return {
     id: message.id,

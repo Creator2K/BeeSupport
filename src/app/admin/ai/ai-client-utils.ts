@@ -62,8 +62,8 @@ export function knowledgeDraftIsDirty(
     );
   }
   return (
-    activeEntry.title !== draft.title ||
-    activeEntry.content !== draft.content ||
+    activeEntry.title !== draft.title.trim() ||
+    activeEntry.content !== draft.content.trim() ||
     activeEntry.enabled !== draft.enabled ||
     (activeEntry.siteId ?? "__global__") !== draft.siteId ||
     activeEntry.keywords.join(",") !==

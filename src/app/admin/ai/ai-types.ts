@@ -26,12 +26,16 @@ export type KnowledgeRecord = {
   siteId: string | null;
   siteName: string | null;
   chunkCount: number;
+  indexStatus?: string | null;
 };
 
 export type IndexStats = {
   entries: number;
   chunks: number;
   vectorized: number;
+  pending: number;
+  processing: number;
+  failed: number;
 };
 
 export type SiteOption = { id: string; name: string };

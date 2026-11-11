@@ -24,6 +24,7 @@ export type AiRunResult = {
   trace: AiToolTrace[];
   knowledge: AiKnowledgeTrace[];
   rounds: number;
+  requests: number;
   usage: { promptTokens: number; completionTokens: number } | null;
 };
 
@@ -37,6 +38,7 @@ export async function runConversation(input: {
   const messages: AiChatMessage[] = [...input.messages];
 
   const usageTotal = { promptTokens: 0, completionTokens: 0 };
+  let requests = 0;
   let rounds = 0;
 
   const toolsEnabled = input.config.enableTools;
@@ -50,6 +52,7 @@ export async function runConversation(input: {
 
   while (rounds < (toolsEnabled ? input.config.maxToolRounds : 1)) {
     rounds += 1;
+    requests += 1;
     const result = await chatCompletion(input.config, messages, {
       model,
       tools: tools.length > 0 ? tools : undefined,
@@ -59,6 +62,9 @@ export async function runConversation(input: {
     if (result.usage) {
       usageTotal.promptTokens += result.usage.promptTokens;
       usageTotal.completionTokens += result.usage.completionTokens;
+    } else {
+      usageTotal.promptTokens += estimateMessageTokens(messages);
+      usageTotal.completionTokens += estimateTextTokens(result.content);
     }
 
     if (result.toolCalls.length === 0) {
@@ -68,6 +74,7 @@ export async function runConversation(input: {
         trace: input.context.trace,
         knowledge: [...input.context.knowledge.values()],
         rounds,
+        requests,
         usage: toUsageOrNull(usageTotal),
       };
     }
@@ -91,6 +98,7 @@ export async function runConversation(input: {
   }
 
   // 工具轮次用尽：强制模型不带工具地给出结论
+  requests += 1;
   const final = await chatCompletion(
     input.config,
     [
@@ -106,6 +114,9 @@ export async function runConversation(input: {
   if (final.usage) {
     usageTotal.promptTokens += final.usage.promptTokens;
     usageTotal.completionTokens += final.usage.completionTokens;
+  } else {
+    usageTotal.promptTokens += estimateMessageTokens(messages);
+    usageTotal.completionTokens += estimateTextTokens(final.content);
   }
 
   return {
@@ -114,10 +125,21 @@ export async function runConversation(input: {
     trace: input.context.trace,
     knowledge: [...input.context.knowledge.values()],
     rounds,
+    requests,
     usage: toUsageOrNull(usageTotal),
   };
 }
 
+function estimateTextTokens(value: string): number {
+  return Math.max(1, Math.ceil(value.length / 2));
+}
+
+function estimateMessageTokens(messages: AiChatMessage[]): number {
+  return messages.reduce(
+    (sum, message) => sum + estimateTextTokens(message.content ?? ""),
+    0,
+  );
+}
 function toUsageOrNull(total: {
   promptTokens: number;
   completionTokens: number;
@@ -133,7 +155,12 @@ export async function buildConversationMessages(input: {
   siteName: string;
   query: string;
   config: AiConfig;
+  policy?: import("../../lib/ai-policy").EffectiveAiPolicy;
   allowMutations: boolean;
+  expectedMessageId?: string;
+  leaseToken?: string;
+  jobId?: string;
+  jobRevision?: number;
   extraSystemHint?: string;
 }): Promise<{
   messages: AiChatMessage[];
@@ -196,7 +223,12 @@ export async function buildConversationMessages(input: {
     siteId: input.siteId,
     visitorId: conversation?.visitorId ?? "",
     config: input.config,
+    policy: input.policy,
     allowMutations: input.allowMutations,
+    expectedMessageId: input.expectedMessageId,
+    leaseToken: input.leaseToken,
+    jobId: input.jobId,
+    jobRevision: input.jobRevision,
     query: input.query,
     trace: [],
     knowledge: new Map(

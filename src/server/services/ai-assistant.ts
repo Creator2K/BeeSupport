@@ -8,12 +8,14 @@ import {
 } from "../../lib/ai";
 import { HttpError, canAccessSite, type SessionUser } from "../../lib/auth";
 import { prisma } from "../../lib/db";
-import { getSiteFeatures } from "./entitlements";
+import { readAiContext } from "./ai-context";
+import { resolveAiPolicyForSite } from "./ai-policy";
 import {
   buildConversationMessages,
   runConversation,
   type AiRunResult,
 } from "./ai-runner";
+import { checkAiQuota, recordAiUsage } from "./ai-usage";
 
 /** 客服工作台：为当前会话生成一条可直接发送的建议回复 */
 export async function suggestAgentReply(input: {
@@ -44,11 +46,19 @@ export async function suggestAgentReply(input: {
   if (!canAccessSite(input.user, conversation.siteId)) {
     throw new AiError("无权访问该站点");
   }
-  if (!(await getSiteFeatures(conversation.siteId)).ai)
-    throw new HttpError(403, "当前套餐未开通 AI 功能");
-  const config = await getAiConfig();
-  if (!config.baseUrl || !config.apiKey || !config.model)
-    throw new AiError("请先在后台「AI 助手」里配置接口、密钥与模型");
+  const resolved = await resolveAiPolicyForSite(conversation.siteId);
+  if (!resolved?.policy.enabled)
+    throw new HttpError(403, "当前商家或站点未启用 AI 功能");
+  const config = resolved.policy.config;
+  if (!(await readAiContext(prisma, input, true)))
+    throw new HttpError(403, "当前会话不可使用 AI 功能");
+  const quota = await checkAiQuota(resolved.tenantId, conversation.siteId, resolved.policy);
+  if (!quota.ok)
+    throw new AiError(
+      quota.reason === "request_limit"
+        ? "AI 本月调用次数已达上限，请联系商家管理员调整策略"
+        : "AI 本月用量已达上限，请联系商家管理员调整策略",
+    );
 
   const { messages, context } = await buildConversationMessages({
     conversationId: input.conversationId,
@@ -56,6 +66,7 @@ export async function suggestAgentReply(input: {
     siteName: conversation.site.name,
     query: conversation.messages[0]?.body ?? "",
     config,
+    policy: resolved.policy,
     allowMutations: false,
     extraSystemHint: [
       "现在你是给「人工客服」提供草稿，不是直接回复访客。",
@@ -64,15 +75,38 @@ export async function suggestAgentReply(input: {
     ].join("\n"),
   });
 
-  const result = await runConversation({
-    config,
-    messages,
-    model: input.model,
-    context,
-  });
-
-  if (!result.text.trim()) throw new AiError("模型没有返回内容");
-  return result;
+  try {
+    const result = await runConversation({
+      config,
+      messages,
+      model: input.model,
+      context,
+    });
+    if (!result.text.trim()) throw new AiError("模型没有返回内容");
+    await recordAiUsage({
+      tenantId: resolved.tenantId,
+      siteId: conversation.siteId,
+      requests: result.requests,
+      promptTokens: result.usage?.promptTokens ?? 0,
+      completionTokens: result.usage?.completionTokens ?? 0,
+    });
+    if (
+      !(await readAiContext(prisma, input, true)) ||
+      !(await resolveAiPolicyForSite(conversation.siteId))?.policy.enabled
+    )
+      throw new HttpError(403, "当前会话不可使用 AI 功能");
+    return result;
+  } catch (error) {
+    await recordAiUsage({
+      tenantId: resolved.tenantId,
+      siteId: conversation.siteId,
+      requests: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      failed: true,
+    }).catch(() => undefined);
+    throw error;
+  }
 }
 
 /** 后台「测试连接」用：直接问一句，看模型是否可用 */

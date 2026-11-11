@@ -28,7 +28,7 @@ export function AiClient({
   sites: SiteOption[];
   indexStats: IndexStats;
 }) {
-  const admin = useAiAdmin(config, entries);
+  const admin = useAiAdmin(config, entries, indexStats);
 
   return (
     <div className="max-w-5xl">

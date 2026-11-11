@@ -150,7 +150,7 @@ export async function saveUpload(
   }
 
   const now = new Date();
-  const dir = path.join(
+  const dir = path.posix.join(
     options.siteId,
     String(now.getFullYear()),
     String(now.getMonth() + 1).padStart(2, "0"),
@@ -170,12 +170,25 @@ export async function saveUpload(
 }
 
 export function resolveStoragePath(storageKey: string): string {
-  const normalized = path.posix.normalize(storageKey).replace(/^\/+/, "");
-  if (normalized.startsWith("..") || path.posix.isAbsolute(normalized)) {
+  // Older Windows uploads used backslashes in the directory portion of the key.
+  const portable = storageKey.replace(/\\/g, "/");
+  if (
+    !portable ||
+    /[:\0]/.test(portable) ||
+    path.posix.isAbsolute(portable) ||
+    portable.split("/").includes("..")
+  ) {
     throw new HttpError(400, "非法的存储路径");
   }
+  const normalized = path.posix.normalize(portable);
   const absolute = path.resolve(storageRoot, normalized);
-  if (!absolute.startsWith(`${storageRoot}${path.sep}`)) {
+  const relative = path.relative(storageRoot, absolute);
+  if (
+    !relative ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
     throw new HttpError(400, "非法的存储路径");
   }
   return absolute;

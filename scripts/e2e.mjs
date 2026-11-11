@@ -766,7 +766,18 @@ async function run(resources) {
       `HTTP ${agentAiResponse.status}`,
     );
 
-    const aiRequest = aiRequests[0];
+    // Other queued conversations may reach the provider first after AI is enabled.
+    // Match this visitor's question instead of depending on worker scheduling order.
+    const questionRequests = aiRequests.filter((item) => {
+      try {
+        return (JSON.parse(item.body).messages ?? []).some(
+          (message) => message.role === "user" && message.content === "你们支持退款吗？",
+        );
+      } catch {
+        return false;
+      }
+    });
+    const aiRequest = questionRequests[0];
     check("模型收到请求", Boolean(aiRequest));
 
     if (process.env.E2E_DEBUG === "1") {
@@ -820,7 +831,7 @@ async function run(resources) {
     }
 
     // 工具调用闭环：模型先要求检索知识库，服务端执行后把结果回填再问一次
-    const toolRound = aiRequests.find((item) => {
+    const toolRound = questionRequests.find((item) => {
       try {
         const parsed = JSON.parse(item.body);
         return (parsed.messages ?? []).some(

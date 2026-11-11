@@ -6,6 +6,8 @@ import { spawn, execFileSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { once } from "node:events";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
@@ -22,7 +24,8 @@ const appUrl = new URL(process.env.TEST_APP_URL);
 appUrl.port = String(Number(process.env.ACCOUNT_E2E_PORT || 3002));
 const APP = appUrl.origin,
   ADMIN = process.env.ADMIN_PATH || "/admin";
-const artifacts = "/tmp/beesupport-account-results",
+const artifacts =
+    process.env.ACCOUNT_E2E_ARTIFACTS || join(tmpdir(), "beesupport-account-results"),
   password = `Test-${stamp}!`;
 const adminDb = new PrismaClient({ datasourceUrl: sourceUrl });
 const db = new PrismaClient({ datasourceUrl: databaseUrl.toString() });

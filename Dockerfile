@@ -16,13 +16,11 @@ RUN corepack enable
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# next build 会加载路由模块做静态分析，因此构建期需要一组占位环境变量。
-# 注意必须用 ENV：`VAR=x cmd1 && cmd2` 里的变量只作用于 cmd1。
-# 这些值只存在于 builder 阶段，运行镜像由 docker compose 注入真实配置。
+# next build 会加载路由模块；签名密钥在构建命令中随机生成，不设置运行期默认值。
+# 运行镜像仍由 docker compose 注入真实配置。
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build" \
-    AUTH_SECRET="build-time-placeholder-secret-not-used-at-runtime" \
     APP_URL="http://localhost:3000"
-RUN pnpm prisma generate && pnpm next build
+RUN AUTH_SECRET="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(48).toString("hex"))')" pnpm build
 # 只保留运行期需要的依赖（prisma / tsx / dotenv 已放入 dependencies）
 RUN pnpm prune --prod
 

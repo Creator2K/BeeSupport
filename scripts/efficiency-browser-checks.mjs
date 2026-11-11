@@ -444,7 +444,7 @@ export async function runEfficiencyChecks({
         .getByRole("button", { name: "查看效率数据", exact: true })
         .click();
       await merchantPage
-        .getByLabel("当前／最后接待客服", { exact: true })
+        .getByRole("combobox", { name: "当前／最后接待客服", exact: true })
         .selectOption(agentA.id);
       await merchantPage
         .getByRole("button", { name: "查看效率数据", exact: true })
@@ -469,11 +469,11 @@ export async function runEfficiencyChecks({
       assert.equal(filtered.summary.total, 4);
       near(filtered.summary.avgResponseSeconds, 100);
       await merchantPage
-        .getByLabel("站点", { exact: true })
+        .getByRole("combobox", { name: "站点", exact: true })
         .selectOption(otherSite.id);
       assert.equal(
         await merchantPage
-          .getByLabel("当前／最后接待客服", { exact: true })
+          .getByRole("combobox", { name: "当前／最后接待客服", exact: true })
           .inputValue(),
         "",
       );
@@ -622,22 +622,23 @@ export async function runEfficiencyChecks({
       await merchantPage
         .getByRole("region", { name: "每日客服效率数据表", exact: true })
         .waitFor();
-      await axe(merchantPage);
-      await merchantPage.screenshot({
-        path: `${artifacts}/efficiency-desktop.png`,
-        fullPage: true,
-      });
-      await merchantPage.setViewportSize({ width: 390, height: 844 });
-      for (const theme of ["light", "dark"]) {
-        await merchantPage.evaluate((value) => {
-          document.documentElement.classList.toggle("dark", value === "dark");
-          document.documentElement.style.colorScheme = value;
-        }, theme);
-        await axe(merchantPage);
-        await merchantPage.screenshot({
-          path: `${artifacts}/efficiency-mobile-${theme}.png`,
-          fullPage: true,
-        });
+      for (const [device, viewport] of [
+        ["desktop", { width: 1280, height: 900 }],
+        ["mobile", { width: 390, height: 844 }],
+      ]) {
+        await merchantPage.setViewportSize(viewport);
+        for (const theme of ["light", "dark"]) {
+          await merchantPage.evaluate((value) => {
+            document.documentElement.classList.toggle("dark", value === "dark");
+            document.documentElement.style.colorScheme = value;
+            window.scrollTo({ top: 0, behavior: "instant" });
+          }, theme);
+          await axe(merchantPage);
+          await merchantPage.screenshot({
+            path: `${artifacts}/efficiency-${device}-${theme}.png`,
+            fullPage: true,
+          });
+        }
       }
       assert.equal(await db.conversation.count({ where: { id: one.id } }), 1);
     });

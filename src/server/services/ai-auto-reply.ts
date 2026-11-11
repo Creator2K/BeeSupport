@@ -1,25 +1,42 @@
-import { randomUUID } from "node:crypto";
+import type { AiJob } from "@prisma/client";
 
-import {
-  AiError,
-  getAiConfig,
-  isAiReady,
-  type AiConfig,
-} from "../../lib/ai";
+import { AiError, type AiConfig } from "../../lib/ai";
+import type { EffectiveAiPolicy } from "../../lib/ai-policy";
 import { countOnlineAgents } from "../../lib/auth";
 import { prisma } from "../../lib/db";
-import { getSiteFeatures } from "./entitlements";
+import { lockConversation } from "../transactions";
+import { broadcastAiUpdate } from "./ai-broadcast";
 import { insertAiMessage } from "./ai-message";
+import { readAiContext } from "./ai-context";
+import {
+  aiJobLease,
+  lockAiJobLease,
+  type AiJobLease,
+  type AiJobOutcome,
+} from "./ai-job-queue";
+import { resolveAiPolicyForSite } from "./ai-policy";
 import {
   buildConversationMessages,
   runConversation,
   type AiRunResult,
 } from "./ai-runner";
+import {
+  checkAiQuota,
+  recordAiUsage,
+  type AiQuotaBlock,
+} from "./ai-usage";
 
 const HUMAN_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
 export type AutoReplyDecision =
-  { reply: true; config: AiConfig } | { reply: false; reason: string };
+  | {
+      reply: true;
+      config: AiConfig;
+      tenantId: string;
+      siteId: string;
+      policy: EffectiveAiPolicy;
+    }
+  | { reply: false; reason: string; quota?: AiQuotaBlock };
 
 /**
  * 是否应该让 AI 自动回复这条会话。
@@ -28,34 +45,23 @@ export type AutoReplyDecision =
 export async function decideAutoReply(
   conversationId: string,
 ): Promise<AutoReplyDecision> {
-  const config = await getAiConfig();
-  if (!isAiReady(config)) return { reply: false, reason: "ai_not_configured" };
+  const conversation = await readAiContext(prisma, { conversationId });
+  if (!conversation) return { reply: false, reason: "conversation_unavailable" };
+
+  const resolved = await resolveAiPolicyForSite(conversation.siteId);
+  if (!resolved) return { reply: false, reason: "site_unavailable" };
+  const config = resolved.policy.config;
+  if (!resolved.policy.enabled) return { reply: false, reason: "ai_policy_disabled" };
   if (config.autoReply === "off")
     return { reply: false, reason: "auto_reply_off" };
 
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      id: true,
-      siteId: true,
-      status: true,
-      messages: {
-        where: {
-          sender: { not: "SYSTEM" },
-          type: { notIn: ["SYSTEM", "NOTE"] },
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 1,
-        select: { sender: true, type: true, body: true },
-      },
-    },
-  });
-
-  if (!conversation) return { reply: false, reason: "conversation_missing" };
-  if (!(await getSiteFeatures(conversation.siteId)).ai)
-    return { reply: false, reason: "plan_ai_disabled" };
-  if (conversation.status === "CLOSED")
-    return { reply: false, reason: "closed" };
+  const quota = await checkAiQuota(resolved.tenantId, conversation.siteId, resolved.policy);
+  if (!quota.ok)
+    return {
+      reply: false,
+      reason: quota.reason === "request_limit" ? "monthly_request_limit" : "monthly_token_limit",
+      quota,
+    };
 
   // 忽略系统消息（例如「已为你接入客服 X」），只看最后一条真实对话
   const lastMeaningful =
@@ -73,7 +79,7 @@ export async function decideAutoReply(
   if (config.autoReply === "no_agent") {
     const online = await countOnlineAgents(conversation.siteId);
     if (online > 0) return { reply: false, reason: "agent_online" };
-    return { reply: true, config };
+    return { reply: true, config, tenantId: resolved.tenantId, siteId: conversation.siteId, policy: resolved.policy };
   }
 
   // always：除非人工刚刚还在回复
@@ -88,7 +94,7 @@ export async function decideAutoReply(
   });
   if (recentAgentMessage) return { reply: false, reason: "human_active" };
 
-  return { reply: true, config };
+  return { reply: true, config, tenantId: resolved.tenantId, siteId: conversation.siteId, policy: resolved.policy };
 }
 
 /**
@@ -96,33 +102,21 @@ export async function decideAutoReply(
  */
 export async function generateAutoReply(
   conversationId: string,
+  leaseToken?: string,
+  task?: AiJobLease & { expectedMessageId: string },
 ): Promise<
   (AiRunResult & { assistantName: string; targetMessageId: string }) | null
 > {
   const decision = await decideAutoReply(conversationId);
   if (!decision.reply) {
+    if (decision.quota) await handOffQuotaBlocked(conversationId, task, decision.quota);
     if (process.env.NODE_ENV !== "production") {
       console.log(`[ai] 跳过自动回复：${decision.reason}`);
     }
     return null;
   }
 
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      siteId: true,
-      site: { select: { name: true } },
-      messages: {
-        where: {
-          sender: { not: "SYSTEM" },
-          type: { notIn: ["SYSTEM", "NOTE"] },
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 1,
-        select: { id: true, sender: true, type: true, body: true },
-      },
-    },
-  });
+  const conversation = await readAiContext(prisma, { conversationId, leaseToken, ...task });
   if (!conversation) return null;
 
   const lastMeaningful =
@@ -141,103 +135,121 @@ export async function generateAutoReply(
     siteName: conversation.site.name,
     query,
     config: decision.config,
-    allowMutations: true,
+    policy: decision.policy,
+    allowMutations: Boolean(leaseToken && decision.policy.allowMutations),
+    expectedMessageId: lastMeaningful.id,
+    leaseToken,
+    ...task,
   });
 
-  const result = await runConversation({
-    config: decision.config,
-    messages,
-    context,
-  });
-
-  if (!result.text.trim()) throw new AiError("模型没有返回内容");
-  return {
-    ...result,
-    assistantName: decision.config.assistantName,
-    targetMessageId: lastMeaningful.id,
-  };
-}
-
-/** 访客消息入库后调用：满足条件就让 AI 回复，失败只记日志，不影响主流程 */
-export async function maybeAutoReply(conversationId: string): Promise<void> {
-  const active = autoReplies.get(conversationId);
-  if (active) {
-    active.dirty = true;
-    return active.promise;
-  }
-  const state = { dirty: true, promise: Promise.resolve() };
-  autoReplies.set(conversationId, state);
-  state.promise = (async () => {
-    for (let attempt = 0; state.dirty && attempt < 3; attempt += 1) {
-      state.dirty = false;
-      if (await runAutoReply(conversationId)) state.dirty = true;
-    }
-  })().finally(() => autoReplies.delete(conversationId));
-  return state.promise;
-}
-
-const autoReplies = new Map<
-  string,
-  { dirty: boolean; promise: Promise<void> }
->();
-
-/** A database lease coalesces triggers across instances without holding a transaction during inference. */
-async function runAutoReply(conversationId: string): Promise<boolean> {
-  const token = randomUUID();
-  const claimed = await prisma.conversation.updateMany({
-    where: {
-      id: conversationId,
-      status: { not: "CLOSED" },
-      OR: [
-        { aiReplyExpiresAt: null },
-        { aiReplyExpiresAt: { lte: new Date() } },
-      ],
-    },
-    data: {
-      aiReplyToken: token,
-      aiReplyExpiresAt: new Date(Date.now() + 15 * 60_000),
-    },
-  });
-  if (!claimed.count) return false;
   try {
-    const generated = await generateAutoReply(conversationId);
-    if (!generated) return false;
-
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      select: { siteId: true, status: true },
+    const result = await runConversation({
+      config: decision.config,
+      messages,
+      context,
     });
-    if (!conversation || conversation.status === "CLOSED") return false;
-    if (!(await getSiteFeatures(conversation.siteId)).ai) return false;
-    const config = await getAiConfig();
-    if (!isAiReady(config) || config.autoReply === "off") return false;
-
-    const inserted = await insertAiMessage({
-      conversationId,
-      siteId: conversation.siteId,
-      body: generated.text,
-      authorName: generated.assistantName,
-      expectedMessageId: generated.targetMessageId,
-      leaseToken: token,
-      meta: {
-        ai: {
-          model: generated.model,
-          tools: generated.trace,
-          knowledge: generated.knowledge,
-          rounds: generated.rounds,
-          usage: generated.usage,
-        },
-      },
+    if (!result.text.trim()) throw new AiError("模型没有返回内容");
+    await recordAiUsage({
+      tenantId: decision.tenantId,
+      siteId: decision.siteId,
+      requests: result.requests,
+      promptTokens: result.usage?.promptTokens ?? 0,
+      completionTokens: result.usage?.completionTokens ?? 0,
     });
-    return inserted === null;
+    return {
+      ...result,
+      assistantName: decision.config.assistantName,
+      targetMessageId: lastMeaningful.id,
+    };
   } catch (error) {
-    const message = error instanceof AiError ? error.message : String(error);
-    console.error("[ai] 自动回复失败:", message);
-    return false;
-  } finally {
-    await prisma.conversation.updateMany({
-      where: { id: conversationId, aiReplyToken: token },
-      data: { aiReplyToken: null, aiReplyExpiresAt: null },
-    });
+    await recordAiUsage({
+      tenantId: decision.tenantId,
+      siteId: decision.siteId,
+      requests: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      failed: true,
+    }).catch(() => undefined);
+    throw error;
   }
+}
+
+async function handOffQuotaBlocked(
+  conversationId: string,
+  task: (AiJobLease & { expectedMessageId: string }) | undefined,
+  quota: AiQuotaBlock,
+) {
+  if (quota.action !== "handoff" || !task?.expectedMessageId) return;
+  const note = await prisma.$transaction(async (tx) => {
+    await lockConversation(tx, conversationId);
+    if (!(await lockAiJobLease(tx, task))) return null;
+    const conversation = await readAiContext(tx, { conversationId, ...task });
+    if (!conversation) return null;
+    const clientId = `ai-quota:${task.expectedMessageId}`;
+    const existing = await tx.message.findUnique({
+      where: { conversationId_clientId: { conversationId, clientId } },
+      select: { id: true },
+    });
+    if (existing) return null;
+    const created = await tx.message.create({
+      data: {
+        conversationId,
+        sender: "SYSTEM",
+        type: "NOTE",
+        body:
+          quota.reason === "request_limit"
+            ? "AI 本月调用次数已达上限，本次未自动回复，请人工跟进。"
+            : "AI 本月用量已达上限，本次未自动回复，请人工跟进。",
+        clientId,
+        readByAgentAt: new Date(),
+      },
+      select: { id: true },
+    });
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: { priority: 3 },
+    });
+    return created.id;
+  });
+  if (note) await broadcastAiUpdate(conversationId, note);
+}
+
+/** The durable worker owns retries; exceptions must reach it instead of being swallowed. */
+export async function processAutoReply(job: AiJob): Promise<AiJobOutcome> {
+  if (!job.conversationId || !job.messageId) throw new Error("Invalid automatic reply task");
+  const identity = { ...aiJobLease(job), expectedMessageId: job.messageId };
+  const generated = await generateAutoReply(job.conversationId, identity.leaseToken, identity);
+  if (!generated) return { status: "SKIPPED", result: { reason: "not_eligible_or_superseded" } };
+
+  const conversation = await readAiContext(prisma, { conversationId: job.conversationId, ...identity });
+  if (!conversation)
+    return { status: "SKIPPED", result: { reason: "access_or_message_changed" } };
+  const resolved = await resolveAiPolicyForSite(conversation.siteId);
+  if (
+    !resolved ||
+    !resolved.policy.enabled ||
+    resolved.policy.config.autoReply === "off"
+  )
+    return { status: "SKIPPED", result: { reason: "policy_changed" } };
+
+  const inserted = await insertAiMessage({
+    conversationId: job.conversationId,
+    siteId: conversation.siteId,
+    body: generated.text,
+    authorName: generated.assistantName,
+    ...identity,
+    meta: {
+      ai: {
+        model: generated.model,
+        tools: generated.trace,
+        knowledge: generated.knowledge,
+        rounds: generated.rounds,
+        requests: generated.requests,
+        usage: generated.usage,
+      },
+    },
+  });
+  return inserted
+    ? { status: "COMPLETED", result: { messageId: inserted } }
+    : { status: "SKIPPED", result: { reason: "superseded_before_commit" } };
 }

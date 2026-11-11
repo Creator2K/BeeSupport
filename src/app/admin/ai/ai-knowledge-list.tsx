@@ -33,7 +33,7 @@ export function AiKnowledgeList({
 }) {
   const t = useT();
   return (
-<Card className="shadow-none">
+<Card className="min-w-0 shadow-none">
           <CardContent className="space-y-3 p-3">
             <div className="relative">
               <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
@@ -51,6 +51,12 @@ export function AiKnowledgeList({
                 chunks: indexStats.chunks,
               })}
             </p>
+
+            {(indexStats.pending > 0 || indexStats.processing > 0 || indexStats.failed > 0) && (
+              <p role="status" className="text-muted-foreground text-xs">
+                {t("ai.indexTasks", { pending: indexStats.pending, processing: indexStats.processing, failed: indexStats.failed })}
+              </p>
+            )}
 
             <div className="max-h-[560px] space-y-1 overflow-y-auto pr-0.5">
               {filteredEntries.length === 0 ? (
@@ -70,7 +76,7 @@ export function AiKnowledgeList({
                         onSelectEntry(entry)
                       }
                       className={cn(
-                        "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
+                        "w-full rounded-md border px-2.5 py-2 text-left transition-colors [&_.text-muted-foreground]:text-foreground/70",
                         active
                           ? "border-primary/40 bg-accent"
                           : "hover:bg-accent/60",
@@ -93,7 +99,7 @@ export function AiKnowledgeList({
                         <span className="text-muted-foreground">
                           {entry.siteName ?? t("canned.scopeGlobal")}
                         </span>
-                        <span className="text-muted-foreground">?</span>
+                        <span className="text-muted-foreground" aria-hidden="true">·</span>
                         <span className="text-muted-foreground">
                           {t("ai.chunks", { count: entry.chunkCount })}
                         </span>
@@ -101,6 +107,11 @@ export function AiKnowledgeList({
                       <span className="text-muted-foreground mt-1 line-clamp-2 block text-[11px]">
                         {entry.content}
                       </span>
+                      {["PENDING", "PROCESSING", "FAILED"].includes(entry.indexStatus ?? "") && (
+                        <span className={cn("mt-1 block text-xs", entry.indexStatus === "FAILED" ? "font-medium text-red-700 dark:text-red-400" : "text-muted-foreground")}>
+                          {t(entry.indexStatus === "FAILED" ? "ai.indexFailed" : entry.indexStatus === "PROCESSING" ? "ai.indexProcessing" : "ai.indexPending")}
+                        </span>
+                      )}
                     </button>
                   );
                 })

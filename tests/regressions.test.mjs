@@ -48,6 +48,7 @@ function messageStore() {
   };
   let queue = Promise.resolve();
   const tx = {
+    $executeRaw: async () => 1,
     $queryRaw: async () => [],
     conversation: {
       findUnique: async () => state.conversation,
@@ -140,7 +141,6 @@ function messageStore() {
       broadcastMessage: async () => {},
       broadcastConversation: async () => {},
     },
-    "./ai": { maybeAutoReply: async () => {} },
     "./notifications": { notifyVisitorMessage: async () => {} },
   });
   return { service, state, prisma };

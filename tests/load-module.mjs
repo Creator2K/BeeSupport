@@ -71,6 +71,7 @@ export function loadAiModule(prisma = {}) {
   const config = loadModule("src/lib/ai-config.ts", { "./db": db });
   const provider = loadModule("src/lib/ai-provider.ts", {
     "./ai-config": config,
+    "./ai-response": loadModule("src/lib/ai-response.ts", { "./ai-config": config }),
   });
   const text = loadModule("src/lib/ai-text.ts");
   const retrieval = loadModule("src/lib/ai-retrieval.ts", {
@@ -145,6 +146,7 @@ export function loadConversationService(dependencies = {}) {
 
 /** Assemble the split message service with explicit test doubles. */
 export function loadMessageService(dependencies = {}) {
+  dependencies = { "./ai-job-queue": loadModule("src/server/services/ai-job-queue.ts", dependencies), ...dependencies };
   const types = loadModule(
     "src/server/services/message-write-types.ts",
     dependencies,
@@ -180,6 +182,7 @@ export function loadMessageService(dependencies = {}) {
 
 /** Assemble the split server AI service with explicit test doubles. */
 export function loadAiService(dependencies = {}) {
+  dependencies = withAiGuards(dependencies);
   const runner = loadModule("src/server/services/ai-runner.ts", dependencies);
   const message = loadModule("src/server/services/ai-message.ts", dependencies);
   const autoReply = loadModule("src/server/services/ai-auto-reply.ts", {
@@ -241,6 +244,7 @@ export function loadSocketModule(dependencies = {}) {
 
 /** Assemble the split AI tool modules with explicit test doubles. */
 export function loadAiToolsModule(dependencies = {}) {
+  dependencies = withAiGuards(dependencies);
   const types = loadModule("src/server/services/ai-tool-types.ts", dependencies);
   const definitions = loadModule(
     "src/server/services/ai-tool-definitions.ts",
@@ -261,4 +265,41 @@ export function loadAiToolsModule(dependencies = {}) {
     "./ai-tool-actions": actions,
   });
   return { ...types, ...definitions, ...readers, ...actions, ...runner };
+}
+
+export function withAiGuards(dependencies = {}) {
+  const defaults = loadAiModule();
+  const defaultConfig = { ...defaults.defaultAiConfig(), enabled: true, autoReply: "always" };
+  const defaultPolicy = {
+    enabled: true,
+    config: defaultConfig,
+    autoReply: "always",
+    allowMutations: true,
+    monthlyRequestLimit: null,
+    monthlyTokenLimit: null,
+    requestLimitScope: "tenant",
+    tokenLimitScope: "tenant",
+    concurrencyLimit: 2,
+    overLimitAction: "skip",
+  };
+  return {
+    "./ai-job-queue": loadModule("src/server/services/ai-job-queue.ts", dependencies),
+    "./ai-context": loadModule("src/server/services/ai-context.ts", {
+      "../../lib/entitlements": entitlements,
+      "./tenants": tenants,
+    }),
+    "./ai-broadcast": loadModule("src/server/services/ai-broadcast.ts", dependencies),
+    "./ai-policy": {
+      resolveAiPolicyForSite: async () => ({
+        tenantId: "legacy",
+        siteName: "Test site",
+        policy: defaultPolicy,
+      }),
+    },
+    "./ai-usage": {
+      checkAiQuota: async () => ({ ok: true }),
+      recordAiUsage: async () => {},
+    },
+    ...dependencies,
+  };
 }

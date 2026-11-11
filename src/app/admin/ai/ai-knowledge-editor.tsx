@@ -63,7 +63,7 @@ export function AiKnowledgeEditor({
   return (
     <>
 {draft ? (
-          <Card className="shadow-none">
+          <Card className="min-w-0 shadow-none">
             <CardHeader className="items-center gap-2">
               <CardTitle className="text-base">
                 {draft.id ? t("ai.knowledgeEdit") : t("ai.knowledgeNew")}

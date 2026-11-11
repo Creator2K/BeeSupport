@@ -1,8 +1,11 @@
 node_modules
 .next
+.next-*
 .git
 .github
 data
+test-results
+backups
 .env
 .env.local
 *.log

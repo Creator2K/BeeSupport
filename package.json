@@ -14,7 +14,13 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "test:db": "node --test --test-concurrency=1 tests/database/*.test.mjs",
     "uploads:cleanup": "tsx scripts/cleanup-uploads.ts",
+    "ops:backup": "node scripts/recovery.mjs backup",
+    "ops:verify": "node scripts/recovery.mjs verify",
+    "ops:restore": "node scripts/recovery.mjs restore",
+    "ops:release-check": "node scripts/release-check.mjs",
+    "test:recovery": "node scripts/recovery-drill.mjs",
     "e2e": "node scripts/e2e.mjs",
+    "e2e:ai-queue": "node scripts/ai-queue-e2e.mjs",
     "e2e:frontend": "node scripts/frontend-e2e.mjs",
     "e2e:features": "node scripts/features-e2e.mjs",
     "e2e:analytics-images": "node scripts/analytics-images-e2e.mjs",
@@ -59,7 +65,9 @@
     "test:unanswered": "node --test tests/unanswered.test.mjs",
     "e2e:unanswered": "cross-env E2E_UNANSWERED=true node --import tsx scripts/account-access-e2e.mjs",
     "test:efficiency": "node --test tests/efficiency.test.mjs",
-    "e2e:efficiency": "cross-env E2E_EFFICIENCY=true node --import tsx scripts/account-access-e2e.mjs"
+    "e2e:efficiency": "cross-env E2E_EFFICIENCY=true node --import tsx scripts/account-access-e2e.mjs",
+    "eval:ai-quality": "node --import tsx scripts/ai-quality.mjs",
+    "e2e:ai-policy": "node --import tsx scripts/ai-policy-browser-check.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

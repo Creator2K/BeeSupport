@@ -1,6 +1,8 @@
 import { HttpError } from "../../lib/auth";
 import { prisma } from "../../lib/db";
-import { broadcastConversation, broadcastMessage } from "./broadcast";
+import { broadcastAiUpdate } from "./ai-broadcast";
+import { readAiContext } from "./ai-context";
+import { lockAiJobLease, type AiJobLease } from "./ai-job-queue";
 import { lockConversation } from "../transactions";
 import type {
   AiKnowledgeTrace,
@@ -16,6 +18,7 @@ export type AiMessageMeta = {
     tools: AiToolTrace[];
     knowledge: AiKnowledgeTrace[];
     rounds: number;
+    requests: number;
     usage: { promptTokens: number; completionTokens: number } | null;
   };
 };
@@ -35,41 +38,23 @@ export async function insertAiMessage(input: {
   meta?: AiMessageMeta;
   expectedMessageId?: string;
   leaseToken?: string;
+  jobId?: string;
+  jobRevision?: number;
 }): Promise<string | null> {
   const body = input.body.trim().slice(0, MAX_AI_BODY_LENGTH);
   if (!body) throw new HttpError(400, "AI 回复内容为空");
 
   const message = await prisma.$transaction(async (tx) => {
     await lockConversation(tx, input.conversationId);
-    const conversation = await tx.conversation.findUnique({
-      where: { id: input.conversationId },
-      select: { status: true, aiReplyToken: true },
-    });
-    if (
-      !conversation ||
-      conversation.status === "CLOSED" ||
-      (input.leaseToken && conversation.aiReplyToken !== input.leaseToken)
-    )
-      return null;
-    if (input.expectedMessageId) {
-      const latest = await tx.message.findFirst({
-        where: {
-          conversationId: input.conversationId,
-          sender: { not: "SYSTEM" },
-          type: { notIn: ["SYSTEM", "NOTE"] },
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        select: { id: true, sender: true },
-      });
-      if (latest?.id !== input.expectedMessageId || latest.sender !== "VISITOR")
-        return null;
-    }
+    if (input.jobId && !(await lockAiJobLease(tx, input as AiJobLease))) return null;
+    if (!(await readAiContext(tx, input))) return null;
     const message = await tx.message.create({
       data: {
         conversationId: input.conversationId,
         sender: "AI",
         type: "TEXT",
         body,
+        clientId: input.expectedMessageId ? `ai-reply:${input.expectedMessageId}` : undefined,
         authorName: input.authorName,
         meta: input.meta ? (input.meta as object) : undefined,
         readByAgentAt: new Date(),
@@ -85,12 +70,19 @@ export async function insertAiMessage(input: {
         unreadForVisitor: { increment: 1 },
       },
     });
+    if (input.jobId) {
+      // Commit the acknowledgement with the reply; a crash cannot leave a delivered reply retrying.
+      await tx.aiJob.update({
+        where: { id: input.jobId },
+        data: { status: "COMPLETED", result: { messageId: message.id }, completedAt: now,
+          leaseToken: null, lockedUntil: null, lastError: null },
+      });
+    }
     return message;
   });
   if (!message) return null;
 
-  await broadcastMessage(message.id);
-  await broadcastConversation(input.conversationId);
+  await broadcastAiUpdate(input.conversationId, message.id);
   return message.id;
 }
 

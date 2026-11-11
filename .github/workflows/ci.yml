@@ -15,9 +15,31 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: beesupport
+          POSTGRES_PASSWORD: ci-database-only
+          POSTGRES_DB: beesupport_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beesupport -d beesupport_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
-      DATABASE_URL: postgresql://build:build@localhost:5432/build
-      AUTH_SECRET: ci-placeholder-secret-for-prisma-generate
+      DATABASE_URL: postgresql://beesupport:ci-database-only@127.0.0.1:5432/beesupport_test
+      TEST_DATABASE_URL: postgresql://beesupport:ci-database-only@127.0.0.1:5432/beesupport_test
+      TEST_APP_URL: http://127.0.0.1:3002
+      APP_URL: http://127.0.0.1:3002
+      ADMIN_PATH: /ci-console
+      ACCOUNT_E2E_BUILD: .next
+      REDIS_URL: ""
+      WECHATBOT_ENABLED: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -36,5 +58,70 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate temporary signing key
+        run: node -e 'require("node:fs").appendFileSync(process.env.GITHUB_ENV, "AUTH_SECRET=" + require("node:crypto").randomBytes(48).toString("hex") + "\n")'
+
       - name: Verify
         run: pnpm check
+
+      - name: Apply migrations to an empty database
+        run: pnpm db:deploy
+
+      - name: Verify database concurrency and tenant isolation
+        run: |
+          pnpm test:db
+          pnpm test:tenants
+
+      - name: Verify subscription transactions
+        run: |
+          pnpm db:seed
+          pnpm test:subscriptions
+
+      - name: Build production application
+        run: pnpm build
+
+      - name: Rehearse database and attachment recovery
+        env:
+          RECOVERY_PG_CONTAINER: ${{ job.services.postgres.id }}
+          RECOVERY_DRILL_BUILD: .next
+          RECOVERY_DRILL_OPS_IMAGE: beesupport-ops:ci
+        run: |
+          docker build -f Dockerfile.ops -t beesupport-ops:ci .
+          pnpm test:recovery
+
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify account access in the browser
+        env:
+          ACCOUNT_E2E_ARTIFACTS: test-results/accounts
+        run: pnpm e2e:accounts
+
+      - name: Verify efficiency metrics and responsive layouts
+        env:
+          ACCOUNT_E2E_ARTIFACTS: test-results/efficiency
+        run: pnpm e2e:efficiency
+
+      - name: Verify durable AI indexing and merchant policy in the browser
+        env:
+          NODE_ENV: production
+          PORT: "3002"
+          BIND_HOST: 127.0.0.1
+          UPLOAD_DIR: test-results/ai-queue/uploads
+          AI_POLICY_E2E_ARTIFACTS: test-results/ai-policy
+        run: |
+          mkdir -p test-results
+          node --import tsx server.ts > test-results/ai-queue-server.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
+          pnpm e2e:ai-queue
+          pnpm e2e:ai-policy
+
+      - name: Preserve browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

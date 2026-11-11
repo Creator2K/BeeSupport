@@ -63,13 +63,7 @@ export async function rebuildKnowledgeIndexAction(input?: {
   useEmbeddings?: boolean;
 }): Promise<{
   ok: boolean;
-  result?: {
-    entries: number;
-    chunks: number;
-    embedded: number;
-    vectorized: boolean;
-    durationMs: number;
-  };
+  result?: { queued: number };
   stats?: { entries: number; chunks: number; vectorized: number };
   error?: string;
 }> {

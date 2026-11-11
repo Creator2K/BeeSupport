@@ -17,6 +17,7 @@ test("uploads enforce file limits and stream authenticated content without loadi
       { siteId: "s1", uploader: "VISITOR", uploaderId: "v1" },
     );
     assert.equal(upload.size, 5);
+    assert.match(upload.storageKey, /^s1\/\d{4}\/\d{2}\/[\da-f-]+\.txt$/);
     const file = await storage.streamUpload(upload.storageKey);
     assert.equal(file.size, 5);
     assert.equal(await new Response(file.body).text(), "hello");
@@ -34,6 +35,62 @@ test("uploads enforce file limits and stream authenticated content without loadi
     await assert.rejects(storage.streamUpload(upload.storageKey), {
       status: 404,
     });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("legacy Windows storage keys resolve portably and reject traversal and absolute paths on both platforms", () => {
+  for (const [platform, root] of [
+    [path.posix, "/uploads"],
+    [path.win32, "C:\\uploads"],
+  ]) {
+    const storage = loadModule("src/lib/storage.ts", {
+      "node:path": platform,
+      "./auth": auth,
+      "./env": { env: { UPLOAD_DIR: root, UPLOAD_MAX_BYTES: 64 } },
+    });
+    for (const key of [
+      "s1/2026/10/file.txt",
+      "s1\\2026\\10/file.txt",
+      "s1\\2026\\10\\file.txt",
+    ]) {
+      assert.equal(
+        storage.resolveStoragePath(key),
+        platform.join(root, "s1", "2026", "10", "file.txt"),
+      );
+    }
+    for (const key of [
+      "", ".", "..", "../private", "..\\private",
+      "s1/../../private", "s1\\..\\..\\private", "/private",
+      "C:\\private", "C:private", "\\\\server\\share\\file",
+      "s1/file:stream", "s1/\0file",
+    ]) {
+      assert.throws(() => storage.resolveStoragePath(key), { status: 400 });
+    }
+  }
+});
+
+test("migrated Windows attachments can be read, streamed and removed through their original database keys", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "beesupport-migrated-upload-"));
+  try {
+    const storage = loadModule("src/lib/storage.ts", {
+      "./auth": auth,
+      "./env": { env: { UPLOAD_DIR: root, UPLOAD_MAX_BYTES: 64 } },
+    });
+    const upload = await storage.saveUpload(
+      new File(["legacy content"], "old.txt", { type: "text/plain" }),
+      { siteId: "s1", uploader: "VISITOR" },
+    );
+    const parts = upload.storageKey.split("/");
+    const legacyKey = `${parts.slice(0, -1).join("\\")}/${parts.at(-1)}`;
+    assert.equal((await storage.readUpload(legacyKey)).toString(), "legacy content");
+    assert.equal(
+      await new Response((await storage.streamUpload(legacyKey)).body).text(),
+      "legacy content",
+    );
+    await storage.deleteUpload(legacyKey);
+    await assert.rejects(storage.readUpload(upload.storageKey), { status: 404 });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,12 +1,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { AiError, getAiConfig } from "@/lib/ai";
+import { AiError } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import {
   knowledgeIndexStats,
-  rebuildKnowledgeIndex,
+  requestKnowledgeIndex,
 } from "@/server/services/knowledge";
 
 export async function rebuildKnowledgeIndexAction(input?: {
@@ -14,13 +14,7 @@ export async function rebuildKnowledgeIndexAction(input?: {
   useEmbeddings?: boolean;
 }): Promise<{
   ok: boolean;
-  result?: {
-    entries: number;
-    chunks: number;
-    embedded: number;
-    vectorized: boolean;
-    durationMs: number;
-  };
+  result?: { queued: number };
   stats?: { entries: number; chunks: number; vectorized: number };
   error?: string;
 }> {
@@ -33,13 +27,9 @@ export async function rebuildKnowledgeIndexAction(input?: {
       })
       .parse(input ?? {});
 
-    const config = await getAiConfig();
-    const result = await rebuildKnowledgeIndex({
+    const result = await requestKnowledgeIndex({
       knowledgeId: parsed.knowledgeId,
-      config:
-        parsed.useEmbeddings === undefined
-          ? config
-          : { ...config, enableEmbeddings: parsed.useEmbeddings },
+      useEmbeddings: parsed.useEmbeddings,
     });
 
     const stats = await knowledgeIndexStats();
@@ -51,9 +41,7 @@ export async function rebuildKnowledgeIndexAction(input?: {
       targetType: "AiKnowledge",
       targetId: parsed.knowledgeId ?? "all",
       meta: {
-        chunks: result.chunks,
-        embedded: result.embedded,
-        vectorized: result.vectorized,
+        queued: result.queued,
       },
     });
 

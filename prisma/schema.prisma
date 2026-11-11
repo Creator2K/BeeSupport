@@ -109,7 +109,7 @@ model Tenant {
   contactEmail String?
   note String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
   users User[]
   sites Site[]
   cannedResponses CannedResponse[]
@@ -123,6 +123,10 @@ model Tenant {
   followUps FollowUp[]
   @@index([status, expiresAt])
   unansweredReminders UnansweredReminder[]
+  aiPolicy AiPolicy?
+  aiSitePolicies AiSitePolicy[]
+  aiUsage AiUsageDaily[]
+  aiJobs AiJob[]
 }
 
 model User {
@@ -234,6 +238,8 @@ model Site {
   riskEvents   RiskEvent[]
   followUpRule FollowUpRule?
   unansweredRule UnansweredRule?
+  aiPolicy AiSitePolicy?
+  aiUsage AiUsageDaily[]
 
   @@index([active])
 }
@@ -272,6 +278,7 @@ model UnansweredRule {
 
 // AI 知识库：命中关键词的条目会作为上下文拼进系统提示词
 model AiKnowledge {
+  indexJob AiJob?
   tenantId String @default("legacy")
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   @@index([tenantId])
@@ -351,6 +358,7 @@ model Visitor {
 }
 
 model Conversation {
+  aiJob AiJob?
   id       String               @id @default(cuid())
   siteId   String
   visitorId String
@@ -398,6 +406,7 @@ model Conversation {
 }
 
 model Message {
+  aiToolEffects AiToolEffect[]
   id             String        @id @default(cuid())
   conversationId String
   sender         MessageSender
@@ -623,6 +632,7 @@ model SubscriptionOrder {
   @@unique([tenantId, clientRequestId])
   @@index([tenantId, createdAt])
   @@index([status, createdAt])
+  @@index([status, reviewedAt])
   // A partial SQL unique index also permits only one PENDING order per tenant.
 }
 
@@ -665,4 +675,104 @@ model FollowUp {
   owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   @@index([tenantId, status, dueAt])
   @@index([ownerId, status, dueAt])
+}
+
+// One durable task per conversation/knowledge entry; newer requests supersede older revisions.
+model AiJob {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id String @id
+  kind String
+  conversationId String? @unique
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  knowledgeId String? @unique
+  knowledge AiKnowledge? @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+  messageId String?
+  revision Int @default(1)
+  payload Json @default("{}")
+  status String @default("PENDING")
+  attempts Int @default(0)
+  availableAt DateTime @default(now())
+  leaseToken String?
+  lockedUntil DateTime?
+  lastError String?
+  result Json?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, availableAt])
+  @@index([status, lockedUntil])
+  @@index([tenantId, status, lockedUntil])
+}
+
+// Receipts commit with tool side effects and survive retries of the same visitor message.
+model AiToolEffect {
+  id String @id @default(cuid())
+  messageId String
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  key String
+  arguments Json
+  output String
+  createdAt DateTime @default(now())
+  @@unique([messageId, key])
+}
+// Merchant and site overrides are additive to the platform-owned provider settings.
+model AiPolicy {
+  tenantId String @id
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enabled Boolean @default(true)
+  autoReply String @default("inherit")
+  assistantName String?
+  systemPrompt String?
+  allowTools Boolean?
+  allowMutations Boolean @default(true)
+  monthlyRequestLimit Int?
+  monthlyTokenLimit Int?
+  concurrencyLimit Int @default(2)
+  overLimitAction String @default("skip")
+  version Int @default(1)
+  updatedById String?
+  updatedByName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Null fields inherit from AiPolicy; an explicit false disables the site.
+model AiSitePolicy {
+  siteId String @id
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enabled Boolean?
+  autoReply String?
+  assistantName String?
+  systemPrompt String?
+  allowTools Boolean?
+  allowMutations Boolean?
+  monthlyRequestLimit Int?
+  monthlyTokenLimit Int?
+  concurrencyLimit Int?
+  overLimitAction String?
+  version Int @default(1)
+  updatedById String?
+  updatedByName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+}
+
+// Day is the Asia/Shanghai calendar date (YYYY-MM-DD), not a UTC instant.
+model AiUsageDaily {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  siteId String
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  day String
+  requests Int @default(0)
+  promptTokens Int @default(0)
+  completionTokens Int @default(0)
+  failures Int @default(0)
+  updatedAt DateTime @updatedAt
+  @@id([tenantId, siteId, day])
+  @@index([tenantId, day])
 }

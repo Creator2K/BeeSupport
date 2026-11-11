@@ -1,4 +1,6 @@
 import type { AiToolCall } from "../../lib/ai";
+import { prisma } from "../../lib/db";
+import { readAiContext } from "./ai-context";
 import type { ToolContext } from "./ai-tool-types";
 import {
   escalateToHuman,
@@ -28,6 +30,15 @@ export async function runTool(
   const args = parseArguments(call.arguments);
 
   try {
+    if (
+      !context.config.enableTools ||
+      context.policy?.enabled === false ||
+      (context.allowMutations &&
+        (context.policy?.allowMutations === false ||
+          context.config.autoReply === "off")) ||
+      !(await readAiContext(prisma, context, !context.allowMutations))
+    )
+      throw new Error("当前会话不可执行 AI 工具");
     switch (call.name) {
       case "search_knowledge":
         return await searchKnowledge(context, args, call.name, startedAt);

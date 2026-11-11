@@ -137,9 +137,9 @@ export function adminNavigation(role: string): NavigationGroup[] {
       items: [
         { path: "/risk", label: "nav.risk", icon: "risk" },
         { path: "/webhooks", label: "nav.webhooks", icon: "webhooks" },
+        { path: "/ai", label: "nav.ai", icon: "ai" },
         ...(platform
           ? [
-              { path: "/ai", label: "nav.ai" as const, icon: "ai" },
               {
                 path: "/branding",
                 label: "nav.branding" as const,

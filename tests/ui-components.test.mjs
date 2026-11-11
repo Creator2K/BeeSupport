@@ -52,6 +52,9 @@ const { AiConnectionTab } = loadUiModule(
   "src/app/admin/ai/ai-connection-tab.tsx",
 );
 const { AiPromptTab } = loadUiModule("src/app/admin/ai/ai-prompt-tab.tsx");
+const { MerchantAiClient } = loadUiModule(
+  "src/app/admin/ai/merchant-ai-client.tsx",
+);
 const { AiKnowledgeTab } = loadUiModule(
   "src/app/admin/ai/ai-knowledge-tab.tsx",
 );
@@ -1599,6 +1602,73 @@ test("visitor panel sections render profile, history and edit controls", () => {
   assert.match(fields, /Good service/);
 });
 
+test("merchant AI policy page renders scope, limits and usage", () => {
+  const tenantPolicy = {
+    scope: "tenant",
+    siteId: null,
+    siteName: "Demo merchant",
+    version: 1,
+    enabledMode: "on",
+    autoReply: "no_agent",
+    assistantName: "Demo assistant",
+    systemPrompt: "Answer only from the knowledge base.",
+    toolsMode: "on",
+    mutationsMode: "off",
+    monthlyRequestLimit: 1000,
+    monthlyTokenLimit: 100000,
+    concurrencyLimit: 2,
+    overLimitAction: "handoff",
+  };
+  const html = renderUi(MerchantAiClient, {
+    settings: {
+      featureEnabled: true,
+      providerReady: true,
+      tenantName: "Demo merchant",
+      tenantPolicy,
+      sitePolicies: [
+        {
+          ...tenantPolicy,
+          scope: "site",
+          siteId: "site-1",
+          siteName: "Main site",
+          version: 0,
+          enabledMode: "inherit",
+          autoReply: "inherit",
+          concurrencyLimit: null,
+          overLimitAction: "inherit",
+        },
+      ],
+      sites: [{ id: "site-1", name: "Main site" }],
+      usage: {
+        month: "2026-10",
+        totals: {
+          requests: 12,
+          promptTokens: 300,
+          completionTokens: 100,
+          totalTokens: 400,
+          failures: 1,
+        },
+        sites: [
+          {
+            siteId: "site-1",
+            siteName: "Main site",
+            requests: 12,
+            promptTokens: 300,
+            completionTokens: 100,
+            totalTokens: 400,
+            failures: 1,
+          },
+        ],
+      },
+    },
+  });
+  assert.match(html, /商家 AI 策略/);
+  assert.match(html, /商家默认 · Demo merchant/);
+  assert.match(html, /站点 · Main site/);
+  assert.match(html, /每月调用次数/);
+  assert.match(html, /本月 AI 用量/);
+  assert.match(html, /400/);
+});
 test("AI admin tabs render model, prompt and knowledge editor controls", () => {
   const form = {
     enabled: true,

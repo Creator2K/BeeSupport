@@ -36,21 +36,23 @@ function tokenize(text: string): string[] {
   return [...tokens];
 }
 
-function scoreKeyword(candidate: KnowledgeCandidate, query: string): number {
-  const haystack = query.toLowerCase();
-  const tokens = tokenize(query);
+function scoreKeyword(
+  candidate: KnowledgeCandidate,
+  haystack: string,
+  tokens: Set<string>,
+): number {
   let score = 0;
 
   for (const keyword of candidate.keywords) {
     const needle = keyword.trim().toLowerCase();
     if (needle && haystack.includes(needle)) score += 6;
-    else if (needle && tokens.includes(needle)) score += 4;
+    else if (needle && tokens.has(needle)) score += 4;
   }
 
   const title = candidate.title.toLowerCase();
   if (title && haystack.includes(title)) score += 4;
   for (const token of tokenize(candidate.title)) {
-    if (tokens.includes(token)) score += 1.5;
+    if (tokens.has(token)) score += 1.5;
   }
 
   const body = candidate.content.toLowerCase();
@@ -81,7 +83,7 @@ export function invalidateKnowledgeCache(): void {
   knowledgeCache.clear();
 }
 
-async function fetchKnowledgeEntries(siteId: string | null) {
+async function fetchKnowledgeEntries(siteId: string, withEmbeddings: boolean) {
   return prisma.aiKnowledge.findMany({
     where: {
       enabled: true,
@@ -98,8 +100,8 @@ async function fetchKnowledgeEntries(siteId: string | null) {
         select: {
           id: true,
           content: true,
-          embedding: true,
-          embeddingModel: true,
+          embedding: withEmbeddings,
+          embeddingModel: withEmbeddings,
         },
         orderBy: { index: "asc" },
       },
@@ -108,8 +110,8 @@ async function fetchKnowledgeEntries(siteId: string | null) {
   });
 }
 
-async function loadKnowledgeEntries(siteId: string | null) {
-  const key = siteId ?? "*";
+async function loadKnowledgeEntries(siteId: string, withEmbeddings: boolean) {
+  const key = JSON.stringify([siteId, withEmbeddings]);
   // Refresh cheap authorization/version metadata on every lookup, including across instances.
   const metadata = await prisma.aiKnowledge.findMany({
     where: {
@@ -130,14 +132,14 @@ async function loadKnowledgeEntries(siteId: string | null) {
   if (cached && cached.expiresAt > Date.now() && cached.signature === signature)
     return cached.entries;
   knowledgeCache.delete(key);
-  const entries = await fetchKnowledgeEntries(siteId);
+  const entries = await fetchKnowledgeEntries(siteId, withEmbeddings);
   const bytes = entries.reduce(
     (sum, entry) =>
       sum +
       entry.content.length * 2 +
       entry.chunks.reduce(
         (size, chunk) =>
-          size + chunk.content.length * 2 + chunk.embedding.length * 8,
+          size + chunk.content.length * 2 + (chunk.embedding?.length ?? 0) * 8,
         0,
       ),
     0,
@@ -172,7 +174,11 @@ export async function retrieveKnowledge(input: {
   topK: number;
   config?: AiConfig;
 }): Promise<KnowledgeHit[]> {
-  const entries = await loadKnowledgeEntries(input.siteId);
+  if (!input.siteId || input.topK <= 0 || !input.query.trim()) return [];
+  const entries = await loadKnowledgeEntries(
+    input.siteId,
+    Boolean(input.config?.enableEmbeddings),
+  );
 
   if (entries.length === 0 || input.topK <= 0) return [];
 
@@ -198,7 +204,8 @@ export async function retrieveKnowledge(input: {
         content: chunk.content,
         keywords: entry.keywords,
         embedding:
-          !input.config || chunk.embeddingModel === input.config.embeddingModel
+          input.config?.enableEmbeddings &&
+          chunk.embeddingModel === input.config.embeddingModel
             ? (chunk.embedding ?? [])
             : [],
       });
@@ -223,8 +230,10 @@ export async function retrieveKnowledge(input: {
     }
   }
 
+  const queryLower = input.query.toLowerCase();
+  const queryTokens = new Set(tokenize(input.query));
   const scored = candidates.map((candidate) => {
-    const keywordScore = scoreKeyword(candidate, input.query);
+    const keywordScore = scoreKeyword(candidate, queryLower, queryTokens);
     let vectorScore = 0;
 
     if (

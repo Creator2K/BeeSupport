@@ -5,7 +5,7 @@ import { recordAudit } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { resourceTenantId } from "@/server/services/tenants";
-import { scheduleKnowledgeIndexRebuild } from "@/server/services/knowledge";
+import { enqueueKnowledgeIndex } from "@/server/services/ai-job-queue";
 import { toActionResult, type ActionResult } from "./result";
 import {
   knowledgeSchema,
@@ -20,7 +20,8 @@ export async function createKnowledgeAction(
     const data = knowledgeSchema.parse(input);
     const tenantId = await resourceTenantId(admin, data.siteId);
 
-    const created = await prisma.aiKnowledge.create({
+    const created = await prisma.$transaction(async (tx) => {
+      const created = await tx.aiKnowledge.create({
       data: {
         tenantId,
         title: data.title,
@@ -30,6 +31,9 @@ export async function createKnowledgeAction(
         enabled: data.enabled,
       },
       select: { id: true },
+      });
+      await enqueueKnowledgeIndex(tx, tenantId, created.id);
+      return created;
     });
 
     await recordAudit({
@@ -42,7 +46,6 @@ export async function createKnowledgeAction(
     });
 
     invalidateKnowledgeCache();
-    scheduleKnowledgeIndexRebuild(created.id);
 
     revalidatePath("/admin", "layout");
     return { ok: true, message: "条目已创建", id: created.id };
@@ -70,7 +73,8 @@ export async function updateKnowledgeAction(
       existing.tenantId,
     );
 
-    await prisma.aiKnowledge.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.aiKnowledge.update({
       where: { id },
       data: {
         tenantId,
@@ -80,6 +84,10 @@ export async function updateKnowledgeAction(
         siteId: data.siteId || null,
         enabled: data.enabled,
       },
+      });
+      // Do not serve stale chunks while the replacement index is pending.
+      await tx.aiKnowledgeChunk.deleteMany({ where: { knowledgeId: id } });
+      await enqueueKnowledgeIndex(tx, tenantId, id);
     });
 
     await recordAudit({
@@ -91,7 +99,6 @@ export async function updateKnowledgeAction(
     });
 
     invalidateKnowledgeCache();
-    scheduleKnowledgeIndexRebuild(id);
 
     revalidatePath("/admin", "layout");
     return { ok: true, message: "条目已更新" };

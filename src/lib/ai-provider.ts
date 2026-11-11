@@ -5,6 +5,7 @@ import {
   resolveModel,
   type AiConfig,
 } from "./ai-config";
+import { readAiError, readAiJson } from "./ai-response";
 
 /* ---------------- 模型列表 ---------------- */
 
@@ -28,24 +29,24 @@ export async function listAiModels(config: {
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
+    const text = await readAiError(response);
     throw new AiError(`接口返回 ${response.status}：${text.slice(0, 200)}`);
   }
 
-  const data = (await response.json()) as {
+  const data = (await readAiJson(response)) as {
     data?: { id?: string; name?: string }[];
     models?: { id?: string; name?: string }[];
   };
 
   // 兼容 OpenAI 的 { data: [...] } 与部分网关的 { models: [...] }
   const rawItems: { id?: string; name?: string }[] = [
-    ...(data.data ?? []),
-    ...(data.models ?? []),
+    ...(Array.isArray(data.data) ? data.data : []),
+    ...(Array.isArray(data.models) ? data.models : []),
   ];
 
   const ids = rawItems
-    .map((item) => item.id ?? item.name ?? "")
-    .filter((id): id is string => Boolean(id))
+    .map((item) => item?.id ?? item?.name ?? "")
+    .filter((id): id is string => typeof id === "string" && Boolean(id))
     .sort((a, b) => a.localeCompare(b));
 
   if (ids.length === 0) throw new AiError("接口没有返回任何模型");
@@ -148,32 +149,23 @@ export async function chatCompletion(
   let response = await send(body);
 
   // 有些 OpenAI 兼容网关还不支持 tools，这里退一步重试一次普通对话
-  if (!response.ok && body.tools) {
-    const text = await response
-      .clone()
-      .text()
-      .catch(() => "");
-    if (
-      response.status === 400 ||
-      response.status === 404 ||
-      response.status === 422
-    ) {
-      console.warn(
-        `[ai] 接口不支持工具调用（${response.status}），已退化为普通对话：${text.slice(0, 120)}`,
-      );
-      const fallback = { ...body };
-      delete fallback.tools;
-      delete fallback.tool_choice;
-      response = await send(fallback);
-    }
+  if (!response.ok && body.tools && [400, 404, 422].includes(response.status)) {
+    const text = await readAiError(response);
+    console.warn(
+      `[ai] 接口不支持工具调用（${response.status}），已退化为普通对话：${text.slice(0, 120)}`,
+    );
+    const fallback = { ...body };
+    delete fallback.tools;
+    delete fallback.tool_choice;
+    response = await send(fallback);
   }
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
+    const text = await readAiError(response);
     throw new AiError(`模型返回 ${response.status}：${text.slice(0, 300)}`);
   }
 
-  const data = (await response.json()) as {
+  const data = (await readAiJson(response)) as {
     choices?: {
       message?: {
         role?: string;
@@ -188,6 +180,19 @@ export async function chatCompletion(
   const choice = data.choices?.[0];
   const message = choice?.message;
   if (!message) throw new AiError("模型没有返回内容");
+  if (
+    (message.content != null && typeof message.content !== "string") ||
+    (message.tool_calls != null &&
+      (!Array.isArray(message.tool_calls) ||
+        message.tool_calls.some(
+          (call) =>
+            !call ||
+            typeof call.id !== "string" ||
+            typeof call.function?.name !== "string" ||
+            typeof call.function?.arguments !== "string",
+        )))
+  )
+    throw new AiError("模型返回的消息格式无效");
 
   const toolCalls: AiToolCall[] = (message.tool_calls ?? []).map((call) => ({
     id: call.id,
@@ -253,16 +258,29 @@ export async function embedTexts(
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
+    const text = await readAiError(response);
     throw new AiError(`向量接口返回 ${response.status}：${text.slice(0, 200)}`);
   }
 
-  const data = (await response.json()) as {
+  const data = (await readAiJson(response, 16 * 1024 * 1024)) as {
     data?: { embedding?: number[]; index?: number }[];
   };
 
-  const items = data.data ?? [];
-  if (items.length === 0) throw new AiError("向量接口没有返回数据");
+  const items = data.data;
+  if (
+    !Array.isArray(items) ||
+    items.length !== texts.length ||
+    items.some(
+      (item) =>
+        !item ||
+        !Array.isArray(item.embedding) ||
+        !item.embedding.length ||
+        !item.embedding.every(
+          (value) => typeof value === "number" && Number.isFinite(value),
+        ),
+    )
+  )
+    throw new AiError("向量接口返回的数据无效");
 
   return items
     .slice()

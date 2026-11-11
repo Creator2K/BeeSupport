@@ -36,7 +36,19 @@ services:
       timeout: 5s
       retries: 20
 
+  ops:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: Dockerfile.ops
+    environment:
+      RECOVERY_DATABASE_URL: ${RECOVERY_DATABASE_URL:-}
+    volumes:
+      - uploads:/source-uploads:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+
   app:
+    image: ${APP_IMAGE:-beesupport:local}
     build:
       context: .
       dockerfile: Dockerfile

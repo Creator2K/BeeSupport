@@ -1,6 +1,13 @@
 import "dotenv/config";
 import { z } from "zod";
 
+// Public examples must never become production signing credentials.
+const placeholderSecrets = new Set([
+  "please-change-me-to-a-long-random-string",
+  "build-time-placeholder-secret-not-used-at-runtime",
+  "ci-placeholder-secret-for-prisma-generate",
+]);
+
 /**
  * 环境变量集中校验。任何一处缺失都会在启动阶段直接失败，
  * 避免把配置问题拖到运行期才暴露。
@@ -65,6 +72,18 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+}).superRefine((config, ctx) => {
+  if (
+    config.NODE_ENV === "production" &&
+    (config.AUTH_SECRET.trim().length < 16 ||
+      placeholderSecrets.has(config.AUTH_SECRET.trim().toLowerCase()))
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["AUTH_SECRET"],
+      message: "生产环境不能使用示例或空白签名密钥，请生成独立随机值",
+    });
+  }
 });
 
 // 空字符串统一视为「未设置」：docker compose 会用 ${VAR:-} 传空串，

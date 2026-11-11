@@ -60,13 +60,14 @@ async function main(): Promise<void> {
   for await (const key of files(root)) {
     const info = await stat(path.join(root, key));
     if (info.mtime >= cutoff) continue;
-    if (
-      await prisma.attachment.findFirst({
-        where: { storageKey: key },
-        select: { id: true },
-      })
-    )
-      continue;
+    // Compare the portable key so historical Windows records are not deleted
+    // as "orphans" after moving the uploads directory to Linux.
+    const stored = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Attachment"
+      WHERE replace("storageKey", chr(92), '/') = ${key}
+      LIMIT 1
+    `;
+    if (stored.length) continue;
     orphaned += 1;
     if (apply) await deleteUpload(key);
   }

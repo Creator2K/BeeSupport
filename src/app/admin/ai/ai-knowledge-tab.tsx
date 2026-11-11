@@ -54,7 +54,7 @@ export function AiKnowledgeTab({
 }: AiKnowledgeTabProps) {
   return (
     <TabsContent value="knowledge" className="mt-4">
-      <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
         <AiKnowledgeList
           entries={entries}
           filteredEntries={filteredEntries}
