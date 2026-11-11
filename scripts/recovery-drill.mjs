@@ -45,9 +45,12 @@ const run = (args, extra, logName) => new Promise((resolve, reject) => {
   child.once("error", reject);
   child.once("close", (code) => log.end(() => code === 0 ? resolve() : reject(new Error(`${logName} failed; see the diagnostic log.`))));
 });
+// A Linux bind mount keeps the container's file ownership. The tools create owner-only directories,
+// so they run as the invoking user; otherwise the drill could not read back or remove their output.
+const invokingUser = typeof process.getuid === "function" ? ["--user", `${process.getuid()}:${process.getgid()}`] : [];
 const runOps = (args, databaseUrl) => new Promise((resolve, reject) => {
   if (!process.env.RECOVERY_PG_CONTAINER) return reject(new Error("Container drill requires RECOVERY_PG_CONTAINER."));
-  const child = spawn("docker", ["run", "--rm", "--network", `container:${process.env.RECOVERY_PG_CONTAINER}`,
+  const child = spawn("docker", ["run", "--rm", ...invokingUser, "--network", `container:${process.env.RECOVERY_PG_CONTAINER}`,
     "-e", "RECOVERY_DATABASE_URL", "-v", `${root}:/fixtures`, process.env.RECOVERY_DRILL_OPS_IMAGE, ...args],
   { env: { ...process.env, RECOVERY_DATABASE_URL: databaseUrl }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   let output = "", diagnostic = "";
