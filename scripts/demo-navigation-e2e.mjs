@@ -219,13 +219,13 @@ try {
           .isVisible(),
         true,
       );
+    // 商家管理员可以配置自己商家的 AI 策略，侧栏里的 AI 入口不属于平台专用页面。
     for (const path of [
       "merchants",
       "plans",
       "orders",
       "branding",
       "settings",
-      "ai",
     ])
       assert.equal(
         await sidebar.locator(`a[href="${admin}/${path}"]`).count(),

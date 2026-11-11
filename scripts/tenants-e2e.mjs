@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 import { io } from "socket.io-client";
 import bcrypt from "bcryptjs";
+import { waitForSettledPage } from "./browser-test-helpers.mjs";
 import { useTestDatabase } from "./test-environment.mjs";
 import { connectSocket } from "./realtime-test-helpers.mjs";
 
@@ -632,6 +633,7 @@ try {
     await page.locator("h1").filter({ hasText: "商家配置与用量" }).waitFor();
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
+      await waitForSettledPage(page);
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth > innerWidth + 1,
