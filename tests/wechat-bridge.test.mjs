@@ -53,13 +53,17 @@ async function startBridge(env) {
     },
   );
   const bridge = { child, port, output: "", exitCode: null };
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   child.stdout.on("data", (chunk) => (bridge.output += chunk));
   child.stderr.on("data", (chunk) => (bridge.output += chunk));
+  child.on("exit", (code) => {
+    bridge.exitCode = code;
+  });
+  // "close" fires after the output streams have ended; "exit" can come first,
+  // while the last lines the process wrote are still in the pipe.
   bridge.exited = new Promise((resolve) =>
-    child.on("exit", (code) => {
-      bridge.exitCode = code;
-      resolve(code);
-    }),
+    child.on("close", (code) => resolve(code)),
   );
   bridge.stop = async () => {
     if (bridge.exitCode === null) child.kill();
@@ -106,6 +110,20 @@ function rawStatusLine(port, text) {
 const sendBody = (text) => JSON.stringify({ to: "filehelper", text });
 const sentCount = (bridge) => bridge.output.split("已发送").length - 1;
 
+// The bridge's log reaches this process through a pipe, independently of the
+// HTTP response, so a response can arrive before the log line it follows.
+// The pipe keeps the order: once the line for `text` is here, so is every
+// earlier one, and the number of sends up to that message is exact.
+async function untilSent(bridge, text, expected) {
+  const line = `（${text.slice(0, 40)}…）`;
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline && !bridge.output.includes(line)) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(bridge.output.includes(line), "the bridge did not log the message");
+  assert.equal(sentCount(bridge), expected);
+}
+
 test("the bridge refuses to start without a token, before signing in", { skip }, async () => {
   for (const env of [{}, { WECHATBOT_TOKEN: "   " }]) {
     const bridge = await startBridge(env);
@@ -138,17 +156,19 @@ test("the bridge checks the token on every request and caps the body size", { sk
 
     const send = (headers, body) =>
       request(port, { method: "POST", path: "/send", headers, body });
-    assert.equal(await send({}, sendBody("hi")), 401);
-    assert.equal(sentCount(bridge), 0);
-    assert.equal(await send(bearer, sendBody("hi")), 200);
-    assert.equal(sentCount(bridge), 1);
+    // 被拒绝的请求不能发出消息：其后那条正常消息的日志到达时，发送次数必须正好等于正常消息的条数
+    assert.equal(await send({}, sendBody("rejected")), 401);
+    assert.equal(await send(bearer, sendBody("first")), 200);
+    await untilSent(bridge, "first", 1);
 
     // 正常的长通知仍然能发，超过 256 KB 的请求不读完就拒绝
-    assert.equal(await send(bearer, sendBody("中".repeat(60_000))), 200);
-    assert.equal(sentCount(bridge), 2);
+    const long = "中".repeat(60_000);
+    assert.equal(await send(bearer, sendBody(long)), 200);
+    await untilSent(bridge, long, 2);
     assert.equal(await send(bearer, sendBody("x".repeat(300 * 1024))), 413);
     assert.equal(await send({}, sendBody("x".repeat(300 * 1024))), 401);
-    assert.equal(sentCount(bridge), 2);
+    assert.equal(await send(bearer, sendBody("last")), 200);
+    await untilSent(bridge, "last", 3);
 
     // 畸形请求只能得到 4xx，不能让进程退出
     assert.match(
