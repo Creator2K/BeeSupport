@@ -51,8 +51,8 @@ export function accentGradient(value: string): string {
   return `linear-gradient(160deg, ${shade(base, 16)} 0%, ${base} 52%, ${shade(base, -18)} 100%)`;
 }
 
-/** 彩色底上应该用白字还是深色字 */
-export function readableTextColor(value: string): "#ffffff" | "#18181b" {
+/** 相对亮度，0 是纯黑，1 是纯白 */
+export function relativeLuminance(value: string): number {
   const color = normalizeHex(value);
   const r = parseInt(color.slice(1, 3), 16) / 255;
   const g = parseInt(color.slice(3, 5), 16) / 255;
@@ -61,8 +61,10 @@ export function readableTextColor(value: string): "#ffffff" | "#18181b" {
   const toLinear = (channel: number) =>
     channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 
-  const luminance =
-    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
 
-  return luminance > 0.6 ? "#18181b" : "#ffffff";
+/** 彩色底上应该用白字还是深色字 */
+export function readableTextColor(value: string): "#ffffff" | "#18181b" {
+  return relativeLuminance(value) > 0.6 ? "#18181b" : "#ffffff";
 }

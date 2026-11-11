@@ -143,6 +143,23 @@
   --card: oklch(0.19 0.01 65);
 }
 
+/* 访客端窗口：主按钮、访客气泡和焦点环跟随站点主色，--site-accent* 由 widget-chat.tsx 写在行内样式里 */
+.widget-brand {
+  --primary: var(--site-accent);
+  --primary-foreground: var(--site-accent-foreground);
+  --bubble: var(--site-accent);
+  --bubble-foreground: var(--site-accent-foreground);
+  --ring: var(--site-accent);
+}
+
+.dark .widget-brand {
+  --primary: var(--site-accent-night);
+  --primary-foreground: var(--site-accent-night-foreground);
+  --bubble: var(--site-accent-night);
+  --bubble-foreground: var(--site-accent-night-foreground);
+  --ring: var(--site-accent-night);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

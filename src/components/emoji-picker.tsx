@@ -59,11 +59,13 @@ export function EmojiPicker({
   value,
   onChange,
   disabled = false,
+  variant = "outline",
 }: {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  variant?: "outline" | "ghost";
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -86,7 +88,7 @@ export function EmojiPicker({
         <Button
           type="button"
           size="icon-sm"
-          variant="outline"
+          variant={variant}
           disabled={disabled}
           aria-label={t("chat.emoji")}
           title={t("chat.emoji")}

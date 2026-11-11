@@ -33,7 +33,7 @@ export function WidgetClosedCard({
   const t = useT();
 
   return (
-    <div className="space-y-3 rounded-lg border px-3 py-3">
+    <div className="bg-card space-y-3 rounded-xl border px-3.5 py-3.5 shadow-xs">
       <p className="text-sm font-medium">{t("widget.closedByAgent")}</p>
       {!ratingEnabled ? null : ratingSubmitted || existingRating ? (
         <p className="text-muted-foreground text-xs">

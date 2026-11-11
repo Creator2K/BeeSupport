@@ -47,7 +47,7 @@ export function WidgetComposer({
   const t = useT();
 
   return (
-    <div className="pb-safe shrink-0 border-t px-3 py-2.5">
+    <div className="pb-safe bg-card shrink-0 border-t px-3 py-2.5">
       {newMessagesBelow ? (
         <Button
           className="mb-2 w-full"
@@ -94,13 +94,13 @@ export function WidgetComposer({
           )}
         </div>
       )}
-      <div className="flex items-end gap-2">
+      <div className="bg-background focus-within:border-ring/60 focus-within:ring-ring/15 flex items-end gap-1 rounded-2xl border p-1 shadow-xs transition-[border-color,box-shadow] focus-within:ring-3">
         <Textarea
           ref={composerRef}
           value={draft}
           rows={1}
           placeholder={t("widget.messagePlaceholder")}
-          className="max-h-32 min-h-9 flex-1 resize-none text-sm"
+          className="max-h-32 min-h-8 flex-1 resize-none border-0 bg-transparent px-2.5 py-1.5 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
           onChange={(event) => {
             onDraftChange(event.target.value);
             onTyping();
@@ -125,13 +125,14 @@ export function WidgetComposer({
             value={draft}
             onChange={onDraftChange}
             disabled={sending}
+            variant="ghost"
           />
         )}
 
         {(config?.imagesEnabled || config?.filesEnabled) && (
           <label
             className={cn(
-              "border-input focus-within:ring-ring inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md border focus-within:ring-2",
+              "focus-within:ring-ring text-muted-foreground hover:bg-accent hover:text-foreground inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors focus-within:ring-2",
               uploading && "pointer-events-none opacity-50",
             )}
             title={t("widget.attach")}
@@ -158,7 +159,7 @@ export function WidgetComposer({
 
         <Button
           size="icon"
-          className="size-9 shrink-0"
+          className="size-8 shrink-0 rounded-xl"
           disabled={!draft.trim() || sending}
           onClick={onSend}
           title={t("widget.send")}

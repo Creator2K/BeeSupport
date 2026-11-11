@@ -59,14 +59,14 @@ export function WidgetMessageList({
     >
       {config?.welcomeMessage ? (
         <div className="flex gap-2">
-          <div className="bg-muted max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed">
+          <div className="bg-card text-foreground max-w-[85%] rounded-2xl border px-3.5 py-2 text-sm leading-relaxed shadow-xs">
             {config.welcomeMessage}
           </div>
         </div>
       ) : null}
 
       {showOfflineNotice ? (
-        <div className="rounded-lg border border-dashed px-3 py-2.5 text-xs">
+        <div className="bg-card rounded-xl border border-dashed px-3.5 py-3 text-xs">
           <p className="font-medium">{t("widget.offlineTitle")}</p>
           <p className="text-muted-foreground mt-0.5 leading-relaxed">
             {config?.offlineMessage ?? t("widget.offlineHint")}
