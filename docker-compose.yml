@@ -79,6 +79,11 @@ services:
       ANONYMOUS_VISITOR_RETENTION_DAYS: ${ANONYMOUS_VISITOR_RETENTION_DAYS:-}
       # 风控规则列表的缓存时间（毫秒），留空为默认 5000，0 为不缓存
       RISK_RULE_CACHE_TTL_MS: ${RISK_RULE_CACHE_TTL_MS:-}
+      # 实时连接：除 APP_URL 和请求 Host 之外还允许的页面来源（逗号分隔），留空表示没有
+      SOCKET_ALLOWED_ORIGINS: ${SOCKET_ALLOWED_ORIGINS:-}
+      # 单个连接内身份与会话权限的复核间隔（毫秒）。这两项传空值会被当成 0（每次都复核），所以写明默认值
+      SOCKET_IDENTITY_TTL_MS: ${SOCKET_IDENTITY_TTL_MS:-5000}
+      SOCKET_CONVERSATION_TTL_MS: ${SOCKET_CONVERSATION_TTL_MS:-5000}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_SECURE: ${SMTP_SECURE:-}
