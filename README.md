@@ -104,10 +104,12 @@ unset ADMIN_EMAIL ADMIN_PASSWORD
 已有 Compose 部署需在 Linux 服务器接入一次更新程序。它使用 systemd，只管理指定部署的 `app` 服务。以 root 身份执行，将最后的路径换成现有 Compose 目录：
 
 ```bash
-curl -fsSLo /root/beesupport-online-updater.sh \
-  https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.3/scripts/online-updater.sh &&
+curl -fL --retry 2 --connect-timeout 15 -o /root/beesupport-online-updater.sh \
+  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater.sh &&
 bash /root/beesupport-online-updater.sh install /opt/beesupport
 ```
+
+如果服务器无法直接下载，可以在电脑上从 [v0.1.3 发布页](https://github.com/Creator2K/BeeSupport/releases/tag/v0.1.3) 下载 `online-updater.sh`，通过 1Panel 上传到 `/root/beesupport-online-updater.sh`，再执行同一条安装命令。
 
 如果正在运行较旧的镜像，接入命令会先拉取 `v0.1.3` 并只重建应用容器。接入后，平台管理员可以在 **平台设置 → 版本更新记录 → 在线更新** 点击「检查更新」，有新版本时点击「立即更新」。服务器下载镜像期间旧版继续运行，切换时可能短暂中断。页面会自动刷新任务状态。
 
