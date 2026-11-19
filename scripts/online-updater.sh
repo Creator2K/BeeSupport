@@ -13,7 +13,7 @@ result_file=.beesupport-update-result
 update_error=
 
 lock_project() {
-  local path owner permissions
+  local mode=$1 path owner permissions lock_file wait_seconds=0 status
   [[ -f .env && ! -L .env ]] || { echo 'A regular .env file is required.' >&2; exit 1; }
   for path in . .env compose.y{a,}ml docker-compose.y{a,}ml {compose,docker-compose}.override.y{a,}ml; do
     [[ -e $path || -L $path ]] || continue
@@ -24,8 +24,32 @@ lock_project() {
     fi
   done
   project_id=$(pwd -P | sha256sum | cut -c1-12)
-  exec 9>"/run/lock/beesupport-update-$project_id.lock"
-  flock -n 9 || exit 0
+  lock_file="/run/lock/beesupport-update-$project_id.lock"
+  exec 9>"$lock_file"
+  if [[ "$mode" == install ]]; then wait_seconds=5; fi
+  flock -E 75 -w "$wait_seconds" 9 || {
+    status=$?
+    if [[ "$status" == 75 ]]; then
+      if [[ "$mode" == run ]]; then exit 0; fi
+      echo 'BeeSupport installation could not get the lock. Another updater or image pull may still be running.' >&2
+      printf 'Check the lock holder: lslocks --notruncate -o PID,COMMAND,PATH | grep -F -- %s\n' "$lock_file" >&2
+    else
+      echo "Could not lock the BeeSupport deployment: $lock_file" >&2
+    fi
+    exit "$status"
+  }
+}
+
+require_app_service() {
+  local services
+  if ! services=$(docker compose config --services); then
+    echo 'Could not read the Compose configuration.' >&2
+    return 1
+  fi
+  if ! grep -qx app <<< "$services"; then
+    echo 'Compose has no app service in this directory.' >&2
+    return 1
+  fi
 }
 
 app_container() {
@@ -149,7 +173,7 @@ replace_app() {
 
 run_update() {
   local container claim id target current extra result temporary
-  lock_project
+  lock_project run
   container=$(app_container)
   [[ -n "$container" ]] || exit 0
   if [[ -f "$result_file" ]]; then report_result; fi
@@ -188,8 +212,9 @@ install_runner() {
     echo 'The Compose directory path contains unsupported characters.' >&2
     exit 1
   }
-  lock_project
-  docker compose config --services | grep -qx app
+  printf 'Installing the BeeSupport updater for %s using image source %s.\n' "$project" "$image_source"
+  lock_project install
+  require_app_service
   container=$(app_container)
   current=
   if [[ -n "$container" ]]; then
@@ -201,7 +226,11 @@ install_runner() {
       exit 1
     fi
   fi
-  control version >/dev/null
+  if ! current=$(control version); then
+    echo 'Could not read the version from the running app container.' >&2
+    exit 1
+  fi
+  printf 'Running BeeSupport version: %s\n' "$current"
 
   unit="beesupport-update-$project_id"
   install -d -m 0755 /usr/local/libexec

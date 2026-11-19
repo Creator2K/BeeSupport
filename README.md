@@ -105,17 +105,17 @@ unset ADMIN_EMAIL ADMIN_PASSWORD
 
 ```bash
 curl -fL --retry 2 --connect-timeout 15 -o /root/beesupport-online-updater.sh \
-  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater.sh &&
+  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater-v2.sh &&
 bash /root/beesupport-online-updater.sh install /opt/beesupport
 ```
 
-如果服务器无法直接下载，可以在电脑上从 [v0.1.3 发布页](https://github.com/Creator2K/BeeSupport/releases/tag/v0.1.3) 下载 `online-updater.sh`，通过 1Panel 上传到 `/root/beesupport-online-updater.sh`，再执行同一条安装命令。
+如果服务器无法直接下载，可以在电脑上从 [v0.1.3 发布页](https://github.com/Creator2K/BeeSupport/releases/tag/v0.1.3) 下载 `online-updater-v2.sh`，通过 1Panel 上传到 `/root/beesupport-online-updater.sh`，再执行同一条安装命令。
 
 国内服务器如果从 GHCR 下载慢，可以使用[南京大学 GHCR 镜像](https://doc.nju.edu.cn/books/e1654)。更新程序按官方摘要下载并继续使用原镜像名。安装一次后，后台更新也会选择该镜像源。
 
 ```bash
 curl -fL --retry 2 --connect-timeout 15 -o /root/beesupport-online-updater.sh \
-  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater-cn.sh &&
+  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater-v2.sh &&
 bash /root/beesupport-online-updater.sh install /opt/beesupport nju
 ```
 
