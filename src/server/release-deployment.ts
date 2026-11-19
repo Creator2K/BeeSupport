@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 
+import { version as packageVersion } from "../../package.json";
 import { prisma } from "../lib/db";
+import { logger } from "../lib/logger";
 
 export async function readImageRelease() {
   let contents: string;
@@ -45,4 +47,12 @@ export async function recordImageRelease() {
     if (previous?.version === release.version && previous.commit === release.commit) return;
     await tx.releaseDeployment.create({ data: release });
   });
+}
+
+export async function getAppRelease() {
+  const image = await readImageRelease().catch((error: unknown) => {
+    logger.error("release.metadata_read_failed", {}, error);
+    return null;
+  });
+  return { version: image?.version ?? `v${packageVersion}`, image };
 }

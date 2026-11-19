@@ -5,6 +5,7 @@ import { ADMIN_PATH } from "@/lib/app-paths";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { unreadNoticeCount } from "@/server/services/account-notices";
+import { getAppRelease } from "@/server/release-deployment";
 
 export default async function AdminLayout({
   children,
@@ -15,7 +16,7 @@ export default async function AdminLayout({
   if (!user) redirect("/login");
   if (user.role === "AGENT") redirect("/agent");
 
-  const [tenant, merchants, orders, conversations, notices] = await Promise.all(
+  const [tenant, merchants, orders, conversations, notices, release] = await Promise.all(
     [
       user.role === "ADMIN"
         ? null
@@ -40,12 +41,14 @@ export default async function AdminLayout({
         },
       }),
       unreadNoticeCount(user),
+      getAppRelease(),
     ],
   );
   return (
     <AdminShell
       key={user.id}
       basePath={ADMIN_PATH}
+      version={release.version}
       user={{
         id: user.id,
         name: user.name,

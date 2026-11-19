@@ -34,6 +34,32 @@ export function BrandingSettingFields({
         const locked = key === "footerText" && !canCustomizeFooter;
         const overridden = !locked && value[key] !== undefined;
         const inputId = `${id}-${key}`;
+        if (key === "launcherDraggable") {
+          return (
+            <div className="space-y-2 rounded-lg border p-3" key={key}>
+              <Label htmlFor={inputId}>{label}</Label>
+              <select
+                id={inputId}
+                value={overridden ? (value[key] ? "on" : "off") : "inherit"}
+                onChange={(e) =>
+                  onChange(e.target.value === "inherit"
+                    ? clearBrandingValue(value, key)
+                    : setBrandingValue(value, key, e.target.value === "on"))
+                }
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="inherit">
+                  {overridden ? "继承默认配置" : `继承默认配置（${settings[key] ? "已开启" : "已关闭"}）`}
+                </option>
+                <option value="on">开启</option>
+                <option value="off">关闭</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                访客可用鼠标或手指移动按钮，点击仍可打开聊天。
+              </p>
+            </div>
+          );
+        }
         return (
           <div className="space-y-2 rounded-lg border p-3" key={key}>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">

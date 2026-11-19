@@ -6,7 +6,7 @@
 
 ## 从空服务器部署
 
-已发布的 `v0.1.1` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
+已发布的 `v0.1.2` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
 
 首次启动会运行三个服务。`app` 包含前端页面、平台后台、API 和 Socket.IO；PostgreSQL 和 Redis 各有自己的容器。上传文件、数据库与 Redis 数据保存在 Compose 数据卷中。
 
@@ -16,11 +16,11 @@
 docker compose version
 mkdir -p /opt/beesupport
 cd /opt/beesupport
-curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.1/docker-compose.yml \
+curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.2/docker-compose.yml \
   -o docker-compose.yml
 ```
 
-镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.1`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.2`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 ### 2. 生成首次安装配置
 
@@ -31,7 +31,7 @@ if [ ! -e .env ]; then
   (
     umask 077
     cat > .env <<EOF
-APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.1
+APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.2
 APP_URL=https://chat.example.com
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 AUTH_SECRET=$(openssl rand -hex 48)
@@ -97,6 +97,8 @@ unset ADMIN_EMAIL ADMIN_PASSWORD
 2. 运行 `grep '^ADMIN_PATH=' .env` 查看后台入口，访问 `APP_URL` 加这个路径，用刚创建的账号登录。客服工作台在 `/agent`。
 3. 在后台创建站点、填写允许接入的域名、创建或邀请客服并分配站点权限。复制后台生成的客服脚本，添加到目标网站的 `</body>` 前。[访客端接入说明](docs/reference.md#访客端接入)
 
+在 **站点管理 → 编辑站点 → 访客窗口品牌与功能** 可开启「允许拖动悬浮按钮」。开启后，访客可以用鼠标或手指移动按钮，同一浏览器刷新后会保留位置。站点也可以继承上级配置或单独关闭拖动。
+
 ## 更新和回退
 
 在原部署目录编辑 `.env` 里的 `APP_IMAGE`，填入目标发布版本。已有数据库或附件的实例在应用数据库迁移前应先备份。
@@ -106,7 +108,7 @@ docker compose pull app &&
 docker compose up -d --no-deps --no-build --wait --wait-timeout 180 app
 ```
 
-镜像下载完成后，Compose 只切换 `app`，沿用原有数据库、Redis 和上传卷。平台管理员在 **平台设置 → 版本更新记录** 查看实际启动的镜像版本、Git 提交和时间。同一版本和提交连续重启只生成一条记录。
+镜像下载完成后，Compose 只切换 `app`，沿用原有数据库、Redis 和上传卷。后台右上角显示当前版本。平台管理员可点击版本号，或从 **平台设置 → 版本更新记录** 查看各版本的变更和实际部署历史。同一版本和提交连续重启只生成一条记录。
 
 回退时把 `APP_IMAGE` 改回上一版本，然后执行相同命令。若新版本已执行数据库迁移，先确认旧版本兼容当前数据库，再按需要恢复备份。[备份与回退步骤](docs/recovery-and-release.md)
 

@@ -24,10 +24,12 @@ type Preferences = {
 export function AdminShell({
   user,
   basePath,
+  version,
   children,
 }: {
   user: ShellUser;
   basePath: string;
+  version?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -141,6 +143,10 @@ export function AdminShell({
           }
           activeGroup={activeGroup}
           activeItem={activeItem}
+          release={version ? {
+            version,
+            href: user.role === "ADMIN" ? `${basePath}/releases` : undefined,
+          } : undefined}
           mobileNav={mobileNav}
         />
         <main className="min-w-0 flex-1 px-4 py-6 md:px-6 md:py-8">

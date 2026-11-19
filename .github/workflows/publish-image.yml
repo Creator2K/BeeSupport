@@ -57,6 +57,46 @@ jobs:
           }
           test "$(versions)" = "$GITHUB_REF_NAME"
 
+          admin_password="$(openssl rand -hex 20)"
+          docker compose exec -T -e SMOKE_ADMIN_PASSWORD="$admin_password" app node - <<'NODE'
+          const { PrismaClient } = require("@prisma/client");
+          const bcrypt = require("bcryptjs");
+          const db = new PrismaClient();
+          async function prepare() {
+            await db.user.create({
+              data: {
+                email: "release-smoke@example.test",
+                name: "Release smoke admin",
+                role: "ADMIN",
+                passwordHash: await bcrypt.hash(process.env.SMOKE_ADMIN_PASSWORD, 10),
+              },
+            });
+            await db.site.create({
+              data: {
+                name: "Release smoke widget",
+                slug: "release-smoke",
+                publicKey: "release-smoke",
+                widgetSettings: { launcherDraggable: true },
+              },
+            });
+          }
+          prepare().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          }).finally(() => db.$disconnect());
+          NODE
+          curl --fail --silent --show-error -c /tmp/beesupport-cookies.txt \
+            -H 'Content-Type: application/json' \
+            --data "{\"email\":\"release-smoke@example.test\",\"password\":\"$admin_password\"}" \
+            http://127.0.0.1:3000/api/auth/login -o /dev/null
+          curl --fail --silent --show-error -b /tmp/beesupport-cookies.txt -H 'Accept-Language: zh-CN' \
+            http://127.0.0.1:3000/admin/releases -o /tmp/beesupport-releases.html
+          grep -Fq "当前版本 $GITHUB_REF_NAME" /tmp/beesupport-releases.html
+          grep -Fq "版本说明" /tmp/beesupport-releases.html
+          grep -Fq "部署历史" /tmp/beesupport-releases.html
+          curl --fail --silent --show-error 'http://127.0.0.1:3000/api/widget/config?key=release-smoke' |
+            jq -e '.site.launcherDraggable == true'
+
           previous_image="$APP_IMAGE"
           next_version=v0.0.0
           if [[ "$GITHUB_REF_NAME" = "$next_version" ]]; then next_version=v0.0.1; fi

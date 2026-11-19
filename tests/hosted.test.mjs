@@ -63,6 +63,12 @@ test("launcher preferences validate allowed styles, bound text and preserve laye
     "pill",
   );
   assert.equal(brand.mergeWidgetSettings().launcherStyle, "bubble");
+  assert.equal(brand.mergeWidgetSettings().launcherDraggable, false);
+  assert.equal(brand.mergeWidgetSettings({ launcherDraggable: true }, {}).launcherDraggable, true);
+  assert.equal(
+    brand.mergeWidgetSettings({ launcherDraggable: true }, { launcherDraggable: false }).launcherDraggable,
+    false,
+  );
 });
 
 test("launcher text stays readable across dark, light and saturated merchant colors", () => {

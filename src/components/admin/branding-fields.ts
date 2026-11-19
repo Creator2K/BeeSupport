@@ -14,6 +14,7 @@ export const brandingFields = [
   ["footerText", "底部品牌文字（可留空）", "text"],
   ["primaryColor", "主题色", "color"],
   ["position", "悬浮按钮位置", "position"],
+  ["launcherDraggable", "允许拖动悬浮按钮", "boolean"],
   ["launcherLabel", "悬浮按钮文案（最多 20 字）", "text"],
   ["maxUploadMB", "单个附件大小上限 MB", "number"],
   ["imagesEnabled", "允许访客发送图片", "boolean"],

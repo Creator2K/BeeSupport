@@ -31,6 +31,7 @@ type AdminShellHeaderProps = {
   onToggleCollapsed: () => void;
   activeGroup: NavigationGroup | undefined;
   activeItem: NavigationItem | undefined;
+  release?: { version: string; href?: string };
   mobileNav: React.ReactNode;
 };
 
@@ -41,6 +42,7 @@ export function AdminShellHeader({
   onToggleCollapsed,
   activeGroup,
   activeItem,
+  release,
   mobileNav,
 }: AdminShellHeaderProps) {
   const { t } = useLocale();
@@ -94,6 +96,19 @@ export function AdminShellHeader({
         </span>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {release?.href ? (
+          <Link
+            href={release.href}
+            aria-label={t("nav.currentVersion", { version: release.version })}
+            className="rounded-md border px-2 py-1 font-mono text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            {release.version}
+          </Link>
+        ) : release && (
+          <span className="rounded-md border px-2 py-1 font-mono text-xs text-muted-foreground">
+            {release.version}
+          </span>
+        )}
         <Button
           asChild
           variant="outline"

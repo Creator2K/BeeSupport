@@ -1313,6 +1313,7 @@ test("branding split components render style controls, fields and preview", () =
     position: "right",
     launcherStyle: "pill",
     launcherLabel: "Chat with us",
+    launcherDraggable: true,
     imagesEnabled: true,
     filesEnabled: false,
     emojiEnabled: true,
@@ -1322,6 +1323,7 @@ test("branding split components render style controls, fields and preview", () =
   const value = {
     title: "Product Chat",
     launcherStyle: "pill",
+    launcherDraggable: true,
     primaryColor: "#336699",
   };
 
@@ -1343,6 +1345,7 @@ test("branding split components render style controls, fields and preview", () =
   assert.match(fields, /\u804a\u5929\u7a97\u53e3\u6807\u9898/);
   assert.match(fields, /\u5e95\u90e8\u54c1\u724c\u6587\u5b57/);
   assert.match(fields, /\u5df2\u5f00\u542f/);
+  assert.match(fields, /允许拖动悬浮按钮/);
 
   const preview = renderUi(BrandingPreview, { settings, mobile: true });
   assert.match(preview, /Product Chat/);
@@ -1463,12 +1466,15 @@ test("admin shell header and navigation expose workspace routes", () => {
     onToggleCollapsed: noop,
     activeGroup: groups[0],
     activeItem: groups[0].items[1],
+    release: { version: "v0.1.2", href: "/console-test/releases" },
     mobileNav: React.createElement("span", null, "mobile-navigation"),
   });
   assert.match(header, /nav\.workspace/);
   assert.match(header, /nav\.merchants/);
   assert.match(header, /nav\.workbench/);
   assert.match(header, /mobile-navigation/);
+  assert.match(header, /href="\/console-test\/releases"/);
+  assert.match(header, />v0\.1\.2<\/a>/);
 });
 
 test("webhook list and form render channel controls", () => {

@@ -49,6 +49,8 @@
   if (launcherStyles.indexOf(forcedStyle) === -1) forcedStyle = null;
 
   var MOBILE_BREAKPOINT = 480;
+  var LAUNCHER_MARGIN = 12;
+  var launcherStorageKey = "beesupport:launcher-position:" + appOrigin + ":" + siteKey;
 
   var state = {
     open: false,
@@ -58,6 +60,7 @@
     position: forcedPosition === "left" ? "left" : "right",
     color: normalizeHex(forcedColor || "#18181b"),
     launcherStyle: forcedStyle || "bubble",
+    launcherDraggable: false,
     label: forcedLabel !== null ? forcedLabel.slice(0, 20) : "在线客服",
     logoUrl: "",
   };
@@ -65,6 +68,7 @@
   var elements = {};
   var cleanups = [];
   var destroyed = false;
+  var launcherLocation = null;
   function listen(target, event, handler) {
     target.addEventListener(event, handler);
     cleanups.push(function () {
@@ -294,9 +298,11 @@
       "@keyframes bee-panel-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}",
       "@keyframes bee-badge-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}",
       "@keyframes bee-halo{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.65);opacity:0}}",
-      ".beesupport-launcher{animation:bee-launcher-in .5s cubic-bezier(.22,1,.36,1) .12s both}",
+      ".beesupport-launcher{cursor:pointer;animation:bee-launcher-in .5s cubic-bezier(.22,1,.36,1) .12s both}",
       ".beesupport-launcher:hover{transform:translateY(-2px) scale(1.04)}",
       ".beesupport-launcher:active{transform:translateY(0) scale(.96)}",
+      ".beesupport-launcher.is-draggable:not(.is-open){cursor:grab;touch-action:none;user-select:none}",
+      ".beesupport-launcher.is-draggable.is-dragging{cursor:grabbing;animation:none;transform:none;transition:none}",
       ".beesupport-launcher:focus-visible{outline:3px solid #18181b;outline-offset:4px}",
       ".beesupport-launcher .bee-icon{transition:opacity .2s ease,transform .28s cubic-bezier(.22,1,.36,1)}",
       ".beesupport-launcher .bee-icon-close{position:absolute;opacity:0;transform:rotate(-60deg) scale(.6)}",
@@ -347,14 +353,12 @@
     button.className = "beesupport-launcher";
     button.style.cssText = [
       "position:fixed",
-      "bottom:max(22px,env(safe-area-inset-bottom,0px))",
       "box-sizing:border-box",
       "max-width:calc(100vw - 44px)",
       "width:58px",
       "height:58px",
       "border-radius:9999px",
       "border:0",
-      "cursor:pointer",
       "z-index:2147483000",
       "display:flex",
       "align-items:center",
@@ -386,6 +390,7 @@
     var avatar = document.createElement("img");
     avatar.className = "bee-avatar";
     avatar.alt = "";
+    avatar.draggable = false;
     avatar.referrerPolicy = "no-referrer";
     avatar.style.display = "none";
     avatar.addEventListener("error", function () {
@@ -413,9 +418,7 @@
     ].join(";");
     button.appendChild(badge);
 
-    button.addEventListener("click", function () {
-      toggle();
-    });
+    bindLauncherInput(button);
 
     elements.launcher = button;
     elements.halo = halo;
@@ -430,6 +433,21 @@
   }
 
   function applyLauncherPosition(button) {
+    if (state.launcherDraggable && launcherLocation) {
+      button.style.left = clampLauncherOffset(
+        launcherLocation.left,
+        document.documentElement.clientWidth - button.offsetWidth,
+      ) + "px";
+      button.style.top = clampLauncherOffset(
+        launcherLocation.top,
+        window.innerHeight - button.offsetHeight,
+      ) + "px";
+      button.style.right = "auto";
+      button.style.bottom = "auto";
+      return;
+    }
+    button.style.top = "auto";
+    button.style.bottom = "max(22px,env(safe-area-inset-bottom,0px))";
     if (state.position === "left") {
       button.style.left = "22px";
       button.style.right = "auto";
@@ -437,6 +455,91 @@
       button.style.right = "22px";
       button.style.left = "auto";
     }
+  }
+
+  function clampLauncherOffset(value, available) {
+    var edge = Math.min(LAUNCHER_MARGIN, Math.max(0, available) / 2);
+    return Math.max(edge, Math.min(value, available - edge));
+  }
+
+  function readLauncherLocation() {
+    try {
+      var location = JSON.parse(window.localStorage.getItem(launcherStorageKey));
+      if (location && Number.isFinite(location.left) && Number.isFinite(location.top))
+        return location;
+    } catch (error) {
+      // The embedded widget still works on sites that disallow local storage.
+    }
+    return null;
+  }
+
+  function bindLauncherInput(button) {
+    var drag = null;
+    var suppressPointerClick = false;
+
+    listen(button, "pointerdown", function (event) {
+      if (!event.isPrimary || event.button !== 0 || drag) return;
+      suppressPointerClick = false;
+      if (!state.launcherDraggable || state.open) return;
+      drag = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        left: button.offsetLeft,
+        top: button.offsetTop,
+        previousLocation: launcherLocation,
+        moved: false,
+      };
+      button.setPointerCapture(event.pointerId);
+    });
+
+    listen(button, "pointermove", function (event) {
+      if (!drag || event.pointerId !== drag.id || !state.launcherDraggable) return;
+      var dx = event.clientX - drag.x;
+      var dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 7) return;
+      drag.moved = true;
+      button.classList.add("is-dragging");
+      launcherLocation = { left: drag.left + dx, top: drag.top + dy };
+      applyLauncherPosition(button);
+    });
+
+    function finishDrag(event, commit) {
+      if (!drag || event.pointerId !== drag.id) return;
+      var completed = drag;
+      drag = null;
+      button.classList.remove("is-dragging");
+      if (!completed.moved) return;
+      suppressPointerClick = true;
+      if (commit && state.launcherDraggable) {
+        launcherLocation = { left: button.offsetLeft, top: button.offsetTop };
+        try {
+          window.localStorage.setItem(launcherStorageKey, JSON.stringify(launcherLocation));
+        } catch (error) {
+          // Preserve the position on this page even when storage is unavailable.
+        }
+      } else {
+        launcherLocation = completed.previousLocation;
+      }
+      applyLauncherPosition(button);
+    }
+
+    listen(button, "pointerup", function (event) {
+      finishDrag(event, true);
+    });
+    listen(button, "pointercancel", function (event) {
+      finishDrag(event, false);
+    });
+    listen(button, "lostpointercapture", function (event) {
+      finishDrag(event, false);
+    });
+    listen(button, "click", function (event) {
+      if (suppressPointerClick && event.detail !== 0) {
+        suppressPointerClick = false;
+        return;
+      }
+      toggle();
+    });
   }
 
   function applyLauncherTheme() {
@@ -535,6 +638,7 @@
     document.body.appendChild(container);
 
     listen(window, "resize", function () {
+      applyLauncherPosition(elements.launcher);
       applyFrameLayout(container, iframe);
     });
   }
@@ -570,6 +674,23 @@
       container.style.right = "22px";
       container.style.left = "auto";
     }
+    if (state.open && state.launcherDraggable && launcherLocation) {
+      var button = elements.launcher;
+      var width = Math.min(400, document.documentElement.clientWidth - 2 * LAUNCHER_MARGIN);
+      var above = button.offsetTop - 2 * LAUNCHER_MARGIN;
+      var below = window.innerHeight - button.offsetTop - button.offsetHeight - 2 * LAUNCHER_MARGIN;
+      var opensAbove = above >= below;
+      var alignRight = button.offsetLeft + button.offsetWidth / 2 > document.documentElement.clientWidth / 2;
+      container.style.width = width + "px";
+      container.style.height = Math.min(640, Math.max(0, above, below)) + "px";
+      container.style.left = clampLauncherOffset(
+        button.offsetLeft + (alignRight ? button.offsetWidth - width : 0),
+        document.documentElement.clientWidth - width,
+      ) + "px";
+      container.style.right = "auto";
+      container.style.top = opensAbove ? "auto" : button.offsetTop + button.offsetHeight + LAUNCHER_MARGIN + "px";
+      container.style.bottom = opensAbove ? window.innerHeight - button.offsetTop + LAUNCHER_MARGIN + "px" : "auto";
+    }
     iframe.style.height = "100%";
   }
 
@@ -578,6 +699,7 @@
   function open() {
     if (state.open) return;
     state.open = true;
+    applyFrameLayout(elements.container, elements.iframe);
     elements.container.style.display = "block";
     // 重新播放入场动画
     elements.container.style.animation = "none";
@@ -642,33 +764,32 @@
   }
 
   function applyTheme(config) {
+    if (!config) return;
     if (
-      config &&
       launcherStyles.indexOf(config.launcherStyle) !== -1 &&
       !forcedStyle
     )
       state.launcherStyle = config.launcherStyle;
     if (
-      config &&
       typeof config.launcherLabel === "string" &&
       forcedLabel === null
     )
       state.label = config.launcherLabel.slice(0, 20);
-    if (config) state.logoUrl = safeLogo(config.logoUrl);
-    if (config && config.position && !forcedPosition) {
+    state.logoUrl = safeLogo(config.logoUrl);
+    if (config.position && !forcedPosition) {
       state.position = config.position === "left" ? "left" : "right";
-      if (elements.launcher) {
-        applyLauncherPosition(elements.launcher);
-      }
-      if (elements.container) {
-        applyFrameLayout(elements.container, elements.iframe);
-      }
     }
 
-    if (config && config.primaryColor && !forcedColor) {
+    if (config.primaryColor && !forcedColor) {
       state.color = normalizeHex(config.primaryColor);
     }
+    if (!state.launcherDraggable && config.launcherDraggable === true)
+      launcherLocation = readLauncherLocation();
+    state.launcherDraggable = config.launcherDraggable === true;
     applyLauncherTheme();
+    elements.launcher.classList.toggle("is-draggable", state.launcherDraggable);
+    applyLauncherPosition(elements.launcher);
+    applyFrameLayout(elements.container, elements.iframe);
   }
 
   /* ---------------- 通信 ---------------- */

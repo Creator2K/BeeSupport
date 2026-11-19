@@ -296,6 +296,7 @@ try {
     await page
       .getByLabel("悬浮按钮文案（最多 20 字）", { exact: true })
       .fill("联系小蜂");
+    await page.getByLabel("允许拖动悬浮按钮", { exact: true }).selectOption("on");
     await page
       .getByRole("button", { name: "保存默认配置", exact: true })
       .click();
@@ -319,6 +320,7 @@ try {
     ).json();
     assert.equal(config.site.launcherStyle, "soft");
     assert.equal(config.site.launcherLabel, "联系小蜂");
+    assert.equal(config.site.launcherDraggable, true);
     for (const internal of ["tenantId", "storageMB", "contactEmail"])
       assert.equal(JSON.stringify(config).includes(internal), false);
     await page.screenshot({
@@ -476,6 +478,57 @@ try {
       path: `${artifacts}/site-preview.png`,
       animations: "disabled",
     });
+  });
+  await test("悬浮按钮可用鼠标或触摸拖动，刷新保留位置，站点可关闭", async () => {
+    await page.setViewportSize({ width: 1120, height: 800 });
+    await db.site.update({ where: { id: site.id }, data: { widgetSettings: {} } });
+    const launcher = await embed();
+    const bounds = () => launcher.evaluate((el) => ({ x: el.offsetLeft, y: el.offsetTop }));
+    let box = await launcher.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(200, 200, { steps: 8 });
+    await page.mouse.up();
+    const desktop = await bounds();
+    assert.ok(desktop.x < box.x - 100 && desktop.y < box.y - 100);
+    assert.equal(await launcher.getAttribute("aria-expanded"), "false");
+    await embed();
+    assert.deepEqual(await bounds(), desktop);
+    await launcher.click();
+    assert.equal(await launcher.getAttribute("aria-expanded"), "true");
+    const panel = await page.locator(".beesupport-panel").boundingBox();
+    box = await launcher.boundingBox();
+    assert.ok(panel.y >= box.y + box.height);
+
+    await page.setViewportSize({ width: 390, height: 750 });
+    await embed();
+    box = await launcher.boundingBox();
+    const touch = await context.newCDPSession(page);
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) }],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: 95, y: 430 }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+    const mobile = await bounds();
+    assert.ok(mobile.y > desktop.y + 100);
+    assert.equal(await launcher.getAttribute("aria-expanded"), "false");
+    await embed();
+    assert.deepEqual(await bounds(), mobile);
+
+    await db.site.update({
+      where: { id: site.id },
+      data: { widgetSettings: { launcherDraggable: false } },
+    });
+    await embed();
+    assert.equal(await launcher.evaluate((el) => el.classList.contains("is-draggable")), false);
+    assert.equal(await launcher.evaluate((el) => el.style.top), "auto");
+    await launcher.click();
+    assert.equal(await launcher.getAttribute("aria-expanded"), "true");
   });
   assert.deepEqual(errors, []);
   console.log(`${results.length} groups passed; no browser exceptions`);
