@@ -35,6 +35,14 @@ model NotificationJob {
   @@index([kind, status, createdAt])
 }
 
+model ReleaseDeployment {
+  id        Int      @id @default(autoincrement())
+  version   String
+  commit    String
+  builtAt   DateTime
+  startedAt DateTime @default(now())
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

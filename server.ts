@@ -21,6 +21,7 @@ import {
 } from "./src/server/socket-origin";
 import { securityHeaders } from "./src/server/security-headers";
 import { deploymentWarnings } from "./src/server/deployment-warnings";
+import { recordImageRelease } from "./src/server/release-deployment";
 import {
   requestPath,
   runWithRequestContext,
@@ -188,6 +189,12 @@ async function main(): Promise<void> {
       databaseUrl: process.env.DATABASE_URL,
     }))
       logger.warn(warning.event, { hint: warning.hint });
+
+    if (!dev) {
+      void recordImageRelease().catch((error: unknown) => {
+        logger.error("release.history_write_failed", {}, error);
+      });
+    }
 
     // 后台开了「启用微信通知」就随服务一起登录，避免重启后漏掉提醒
     void (async () => {

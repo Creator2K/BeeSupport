@@ -176,6 +176,24 @@ docker compose exec \
 属性，因此内网 http 部署同样可以正常登录。生产环境 `APP_URL` 不是 https、或数据库仍在用仓库公开的
 示例密码时，启动日志会各打一条 `config.*` 警告，不阻止启动。
 
+### 1Panel 拉取发布镜像升级
+
+推送 `vX.Y.Z` 标签会触发 GitHub Actions。流程把前端、后端和 Socket.IO 打进同一个 Linux amd64 镜像，
+用 Compose 验证镜像能启动和记录版本，再发布到 `ghcr.io/creator2k/beesupport`。
+
+在 1Panel 服务器进入现有 Compose 项目目录。私有镜像需先运行
+`docker login ghcr.io -u 你的GitHub用户名`，按提示输入对镜像包有读取权限、含 `read:packages` 的 GitHub 经典访问令牌。
+把现有 `.env` 的 `APP_IMAGE` 改为要部署的版本，例如 `APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.1`，然后运行：
+
+```bash
+docker compose pull app
+docker compose up -d --no-deps --no-build --wait --wait-timeout 180 app
+```
+
+新版下载完成后切换 `app`。请沿用现有 Compose 项目、PostgreSQL、Redis 和上传卷。
+平台管理员在「平台设置 → 版本更新记录」查看当前镜像版本、提交和启动历史。相同版本和提交重复启动只记一次。
+回退时把 `APP_IMAGE` 改回原版本并重复上述命令。启动时会应用数据库迁移，涉及迁移的版本请先按[发布手册](docs/recovery-and-release.md)备份并检查回退兼容性。
+
 ### 容器用户与升级
 
 应用容器以非 root 用户 `node`（UID/GID 1000）运行：代码和依赖对它只读，`/app` 下可写的只有上传目录和

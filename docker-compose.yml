@@ -49,6 +49,7 @@ services:
       - ${BACKUP_DIR:-./backups}:/backups
 
   app:
+    # 1Panel 升级时在 .env 设置已发布的 APP_IMAGE，只拉取并重建本服务。
     image: ${APP_IMAGE:-beesupport:local}
     build:
       context: .

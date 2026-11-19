@@ -151,6 +151,11 @@ export function adminNavigation(role: string): NavigationGroup[] {
                 icon: "settings",
               },
               {
+                path: "/releases",
+                label: "nav.releases" as const,
+                icon: "audit",
+              },
+              {
                 path: "/deliveries",
                 label: "nav.deliveries" as const,
                 icon: "webhooks",
