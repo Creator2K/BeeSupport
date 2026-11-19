@@ -94,12 +94,36 @@ jobs:
           grep -Fq "当前版本 $GITHUB_REF_NAME" /tmp/beesupport-releases.html
           grep -Fq "版本说明" /tmp/beesupport-releases.html
           grep -Fq "部署历史" /tmp/beesupport-releases.html
+          grep -Fq "在线更新" /tmp/beesupport-releases.html
           curl --fail --silent --show-error 'http://127.0.0.1:3000/api/widget/config?key=release-smoke' |
             jq -e '.site.launcherDraggable == true'
 
           previous_image="$APP_IMAGE"
           next_version=v0.0.0
           if [[ "$GITHUB_REF_NAME" = "$next_version" ]]; then next_version=v0.0.1; fi
+          control() {
+            docker compose exec -T app node --import tsx scripts/online-update-control.ts "$@"
+          }
+          test -z "$(control claim)"
+          docker compose exec -T -e SMOKE_UPDATE_VERSION="$next_version" app node --import tsx - <<'NODE'
+          const { requestUpdate } = require("./src/server/online-update.ts");
+          const { prisma } = require("./src/lib/db.ts");
+          Promise.allSettled([
+            requestUpdate(process.env.SMOKE_UPDATE_VERSION),
+            requestUpdate(process.env.SMOKE_UPDATE_VERSION),
+          ]).then((results) => {
+            if (results.filter((result) => result.status === "fulfilled").length !== 1)
+              throw new Error("Expected exactly one queued update");
+          }).catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          }).finally(() => prisma.$disconnect());
+          NODE
+          IFS=$'\t' read -r job_id queued_version current_version <<< "$(control claim)"
+          test -n "$job_id"
+          test "$queued_version" = "$next_version"
+          test "$current_version" = "$GITHUB_REF_NAME"
+          test -z "$(control claim)"
           docker build --build-arg "BASE_IMAGE=$previous_image" --build-arg "VERSION=$next_version" \
             --tag beesupport:upgrade-test - <<'DOCKERFILE'
           ARG BASE_IMAGE
@@ -113,6 +137,9 @@ jobs:
           dependencies="$(docker compose ps -q postgres redis)"
           APP_IMAGE=beesupport:upgrade-test docker compose up -d --no-deps --no-build --wait --wait-timeout 180 app
           test "$(versions)" = "$(printf '%s\n%s' "$GITHUB_REF_NAME" "$next_version")"
+          control finish "$job_id" success
+          test "$(docker compose exec -T postgres psql -XAt -v ON_ERROR_STOP=1 -U beesupport -d beesupport \
+            -c "SELECT value->'job'->>'status' FROM \"Setting\" WHERE key='platform.online-update';")" = success
           docker compose up -d --no-deps --no-build --wait --wait-timeout 180 app
           docker compose up -d --no-deps --no-build --force-recreate --wait --wait-timeout 180 app
           test "$(versions)" = "$(printf '%s\n%s\n%s' "$GITHUB_REF_NAME" "$next_version" "$GITHUB_REF_NAME")"

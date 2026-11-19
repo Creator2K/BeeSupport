@@ -6,7 +6,7 @@
 
 ## 从空服务器部署
 
-已发布的 `v0.1.2` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
+已发布的 `v0.1.3` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
 
 首次启动会运行三个服务。`app` 包含前端页面、平台后台、API 和 Socket.IO；PostgreSQL 和 Redis 各有自己的容器。上传文件、数据库与 Redis 数据保存在 Compose 数据卷中。
 
@@ -16,11 +16,11 @@
 docker compose version
 mkdir -p /opt/beesupport
 cd /opt/beesupport
-curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.2/docker-compose.yml \
+curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.3/docker-compose.yml \
   -o docker-compose.yml
 ```
 
-镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.2`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.3`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 ### 2. 生成首次安装配置
 
@@ -31,7 +31,7 @@ if [ ! -e .env ]; then
   (
     umask 077
     cat > .env <<EOF
-APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.2
+APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.3
 APP_URL=https://chat.example.com
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 AUTH_SECRET=$(openssl rand -hex 48)
@@ -99,7 +99,21 @@ unset ADMIN_EMAIL ADMIN_PASSWORD
 
 在 **站点管理 → 编辑站点 → 访客窗口品牌与功能** 可开启「允许拖动悬浮按钮」。开启后，访客可以用鼠标或手指移动按钮，同一浏览器刷新后会保留位置。站点也可以继承上级配置或单独关闭拖动。
 
-## 更新和回退
+## 启用后台在线更新
+
+已有 Compose 部署需在 Linux 服务器接入一次更新程序。它使用 systemd，只管理指定部署的 `app` 服务。以 root 身份执行，将最后的路径换成现有 Compose 目录：
+
+```bash
+curl -fsSLo /root/beesupport-online-updater.sh \
+  https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.3/scripts/online-updater.sh &&
+bash /root/beesupport-online-updater.sh install /opt/beesupport
+```
+
+如果正在运行较旧的镜像，接入命令会先拉取 `v0.1.3` 并只重建应用容器。接入后，平台管理员可以在 **平台设置 → 版本更新记录 → 在线更新** 点击「检查更新」，有新版本时点击「立即更新」。服务器下载镜像期间旧版继续运行，切换时可能短暂中断。页面会自动刷新任务状态。
+
+更新程序通过 Docker Compose 调用应用的内部命令。应用容器无需挂载 Docker socket。部署目录及配置文件由 root 管理。日志可用安装命令最后打印的 `journalctl` 命令查看。
+
+## 命令行更新和回退
 
 在原部署目录编辑 `.env` 里的 `APP_IMAGE`，填入目标发布版本。已有数据库或附件的实例在应用数据库迁移前应先备份。
 

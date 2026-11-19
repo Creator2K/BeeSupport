@@ -42,6 +42,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 # 自定义 server 通过 tsx 直接运行 TS 源码，因此 src 也要进运行镜像
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/scripts/online-update-control.ts ./scripts/online-update-control.ts
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json

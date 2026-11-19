@@ -1,5 +1,13 @@
 export const releaseNotes = [
   {
+    version: "v0.1.3",
+    title: "平台后台在线更新",
+    changes: [
+      "版本更新记录页可检查 GitHub 正式版本并提交更新。",
+      "服务器更新程序先下载完整镜像，再替换应用容器。后台会显示排队、运行和结果。",
+    ],
+  },
+  {
     version: "v0.1.2",
     title: "后台版本显示与客服按钮拖动",
     changes: [

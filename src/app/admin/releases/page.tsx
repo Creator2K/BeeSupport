@@ -12,16 +12,20 @@ import { env } from "@/lib/env";
 import { requirePlatformPage } from "@/lib/platform-page";
 import { releaseNotes } from "@/lib/release-notes";
 import { getAppRelease } from "@/server/release-deployment";
+import { isUpdaterConnected, latestPublishedRelease, readUpdateState } from "@/server/online-update";
+import { OnlineUpdatePanel } from "./online-update-panel";
 
 export const metadata = { title: "版本更新记录" };
 export const dynamic = "force-dynamic";
 
 export default async function ReleasesPage() {
   await requirePlatformPage();
-  const [release, history] = await Promise.all([
+  const [release, history, state] = await Promise.all([
     getAppRelease(),
     prisma.releaseDeployment.findMany({ orderBy: { id: "desc" }, take: 51 }),
+    readUpdateState(),
   ]);
+  const published = await latestPublishedRelease(release.version);
   const latest = history[0];
   const currentDeployment =
     latest && release.image?.version === latest.version && release.image.commit === latest.commit
@@ -50,6 +54,12 @@ export default async function ReleasesPage() {
           value={currentDeployment ? displayTime.format(currentDeployment.startedAt) : "—"}
         />
       </div>
+      <OnlineUpdatePanel
+        {...published}
+        connected={isUpdaterConnected(state)}
+        image={!!release.image}
+        job={state.job}
+      />
       <section className="space-y-3" aria-labelledby="release-notes-title">
         <h2 id="release-notes-title" className="text-lg font-semibold">版本说明</h2>
         {releaseNotes.map(({ version, title, changes }) => (
