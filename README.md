@@ -111,6 +111,14 @@ bash /root/beesupport-online-updater.sh install /opt/beesupport
 
 如果服务器无法直接下载，可以在电脑上从 [v0.1.3 发布页](https://github.com/Creator2K/BeeSupport/releases/tag/v0.1.3) 下载 `online-updater.sh`，通过 1Panel 上传到 `/root/beesupport-online-updater.sh`，再执行同一条安装命令。
 
+国内服务器如果从 GHCR 下载慢，可以使用[南京大学 GHCR 镜像](https://doc.nju.edu.cn/books/e1654)。更新程序按官方摘要下载并继续使用原镜像名。安装一次后，后台更新也会选择该镜像源。
+
+```bash
+curl -fL --retry 2 --connect-timeout 15 -o /root/beesupport-online-updater.sh \
+  https://github.com/Creator2K/BeeSupport/releases/download/v0.1.3/online-updater-cn.sh &&
+bash /root/beesupport-online-updater.sh install /opt/beesupport nju
+```
+
 如果正在运行较旧的镜像，接入命令会先拉取 `v0.1.3` 并只重建应用容器。接入后，平台管理员可以在 **平台设置 → 版本更新记录 → 在线更新** 点击「检查更新」，有新版本时点击「立即更新」。服务器下载镜像期间旧版继续运行，切换时可能短暂中断。页面会自动刷新任务状态。
 
 更新程序通过 Docker Compose 调用应用的内部命令。应用容器无需挂载 Docker socket。部署目录及配置文件由 root 管理。日志可用安装命令最后打印的 `journalctl` 命令查看。

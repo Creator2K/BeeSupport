@@ -4,6 +4,9 @@ umask 077
 
 repository=ghcr.io/creator2k/beesupport
 bootstrap_version=v0.1.3
+# The official bootstrap image can be verified without contacting GHCR.
+bootstrap_digest=sha256:6657a70c71279a83a81806fbf709ee9a344e002dd549c1a7b0f6898ca8e90aee
+image_source=${BEESUPPORT_IMAGE_SOURCE:-github}
 version_pattern='^v(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})$'
 runner=/usr/local/libexec/beesupport-online-updater
 result_file=.beesupport-update-result
@@ -69,6 +72,42 @@ migrations() {
   '
 }
 
+official_digest() {
+  if [[ "$1" == "$bootstrap_version" ]]; then
+    printf '%s\n' "$bootstrap_digest"
+    return
+  fi
+  timeout 30s docker manifest inspect --verbose "$repository:$1" |
+    awk '
+      /"Descriptor"[[:space:]]*:/ { descriptor = 1; digest = ""; linux = amd64 = 0 }
+      descriptor && /"digest"[[:space:]]*:/ && !digest {
+        if (match($0, /sha256:[0-9a-f]+/)) digest = substr($0, RSTART, RLENGTH)
+      }
+      descriptor && /"os"[[:space:]]*:[[:space:]]*"linux"/ { linux = 1 }
+      descriptor && /"architecture"[[:space:]]*:[[:space:]]*"amd64"/ { amd64 = 1 }
+      descriptor && linux && amd64 && length(digest) == 71 && !selected {
+        selected = digest
+      }
+      END { if (selected) print selected; else exit 1 }
+    '
+}
+
+pull_image() {
+  local version=$1 image="$repository:$1" digest mirror_image
+  if [[ "$image_source" == github ]]; then
+    timeout 25m env APP_IMAGE="$image" docker compose pull app
+    return
+  fi
+  if ! digest=$(official_digest "$version") || [[ ! $digest =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "Could not verify the official BeeSupport $version digest." >&2
+    return 1
+  fi
+  mirror_image="ghcr.nju.edu.cn/creator2k/beesupport@$digest"
+  echo "Pulling BeeSupport $version via the Nanjing University mirror."
+  timeout 25m docker pull --platform linux/amd64 "$mirror_image" &&
+    docker tag "$mirror_image" "$image"
+}
+
 replace_app() {
   local version=$1 image="$repository:$1" container previous target builds
   [[ $version =~ $version_pattern ]] || return 1
@@ -78,7 +117,7 @@ replace_app() {
     previous=$(docker inspect -f '{{.Image}}' "$container") || return 1
   fi
   update_error=download
-  timeout 25m env APP_IMAGE="$image" docker compose pull app || return 1
+  pull_image "$version" || return 1
   target=$(docker image inspect -f '{{.Id}}' "$image") || return 1
   builds=$(docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image") || return 1
   [[ $builds == "$version" ]] || return 1
@@ -178,6 +217,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=$project
+Environment=BEESUPPORT_IMAGE_SOURCE=$image_source
 ExecStart=$runner run
 TimeoutStartSec=40min
 EOF
@@ -200,8 +240,13 @@ EOF
 }
 
 unset APP_IMAGE
+if [[ "${1:-}" == install && -n "${3:-}" ]]; then image_source=$3; fi
+case "$image_source" in
+  github|nju) ;;
+  *) echo 'Image source must be github or nju.' >&2; exit 2 ;;
+esac
 case "${1:-}" in
   install) install_runner "${2:?Provide the existing Compose directory path}" ;;
   run) run_update ;;
-  *) echo "Usage: bash $0 install /path/to/beesupport" >&2; exit 2 ;;
+  *) echo "Usage: bash $0 install /path/to/beesupport [github|nju]" >&2; exit 2 ;;
 esac
