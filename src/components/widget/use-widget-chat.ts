@@ -136,13 +136,14 @@ export function useWidgetChat({
   });
 
   useWidgetRealtime({
+    siteKey: config?.publicKey ?? "",
+    embedToken,
     socket,
     connected,
     token,
     parentOpened,
     conversationIdRef,
     messagesRef,
-    reportTrackRef,
     fetchState: fetchWidgetState,
     markRead,
     setConversation,

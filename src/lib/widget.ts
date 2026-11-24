@@ -17,7 +17,7 @@ export async function getSiteAvailability(site: {
   workHours: unknown;
 }): Promise<SiteAvailability> {
   const withinWorkHours = isWithinWorkHours(site.workHours);
-  const agentsOnline = await countOnlineAgents(site.id);
+  const agentsOnline = await countOnlineAgents(site.id, { includeAway: false });
 
   return {
     online: withinWorkHours && agentsOnline > 0,

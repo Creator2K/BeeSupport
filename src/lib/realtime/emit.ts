@@ -38,7 +38,7 @@ export function emitMessage(payload: {
   conversationId: string;
   message: SerializedMessage;
   conversation: SerializedConversation;
-}): void {
+}, event: "message:new" | "message:deleted" = "message:new"): void {
   // 会话房间（客服工作台已打开该会话）+ 访客个人房间（访客端无需依赖 join 时机）
   emit(
     [
@@ -46,12 +46,12 @@ export function emitMessage(payload: {
       rooms.tenantAdmins(payload.conversation.tenantId ?? "legacy"),
       rooms.admins(),
     ],
-    "message:new",
+    event,
     payload,
   );
   // 内部备注只给客服看，不能推给访客房间
   if (payload.message.type !== "NOTE") {
-    emit(rooms.visitor(payload.conversation.visitor.id), "message:new", {
+    emit(rooms.visitor(payload.conversation.visitor.id), event, {
       conversationId: payload.conversationId,
       message: visitorMessage(payload.message),
       conversation: visitorConversation(payload.conversation),

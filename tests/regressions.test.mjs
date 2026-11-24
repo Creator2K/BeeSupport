@@ -461,6 +461,13 @@ test("a long disconnect restarts history at the latest window so missed pages re
   assert.equal(snapshotHasOlderMessages(current, latest, false), true);
 });
 
+test("an older response arriving after deletion cannot restore message content", () => {
+  const original = { id: "m", body: "original", attachments: [{ id: "f" }], createdAt: "01" };
+  const deleted = { ...original, deletedAt: "02", body: "", attachments: [] };
+  assert.deepEqual(mergeMessageSnapshot([original], [deleted]), [deleted]);
+  assert.deepEqual(mergeMessageSnapshot([deleted], [original]), [deleted]);
+});
+
 test("polling preserves exhausted history until a disconnect actually creates a gap", () => {
   const history = Array.from({ length: 205 }, (_, index) => ({
     id: `m${index}`,

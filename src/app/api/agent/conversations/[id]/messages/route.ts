@@ -5,6 +5,7 @@ import { z } from "zod";
 import { readJson, toErrorResponse } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { postAgentMessage } from "@/server/services/messages";
+import { deleteAgentMessage } from "@/server/services/message-deletion";
 
 const bodySchema = z.object({
   body: z.string().max(5000).default(""),
@@ -12,6 +13,17 @@ const bodySchema = z.object({
   clientId: z.string().trim().min(1).max(64).optional(),
   attachmentIds: z.array(z.string().min(1)).max(10).optional(),
 });
+
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await requireUser();
+    const { id } = await context.params;
+    const { messageId } = z.object({ messageId: z.string().min(1) }).parse(await readJson(request));
+    return NextResponse.json({ message: await deleteAgentMessage(user, id, messageId) });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
 
 export async function POST(
   request: Request,

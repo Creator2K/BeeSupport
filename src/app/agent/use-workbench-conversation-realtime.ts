@@ -10,6 +10,7 @@ import type {
 } from "@/lib/realtime/types";
 
 import type { WorkbenchAlert } from "./use-workbench-preferences";
+import { applyMessageDeletion } from "@/lib/realtime/messages";
 import type { useWorkbenchConversationList } from "./use-workbench-conversation-list";
 import type { useWorkbenchMessageThread } from "./use-workbench-message-thread";
 
@@ -165,6 +166,14 @@ export function useWorkbenchConversationRealtime({
       });
     };
 
+    const onDelete = (payload: Parameters<typeof onMessage>[0]) => {
+      upsertConversation(payload.conversation);
+      const id = payload.conversationId;
+      setMessages((previous) => previous[id]
+        ? { ...previous, [id]: applyMessageDeletion(previous[id], payload.message) }
+        : previous);
+    };
+    socket.on("message:deleted", onDelete);
     socket.on("message:new", onMessage);
     socket.on("conversation:updated", onConversationUpdated);
     socket.on("conversation:created", onConversationCreated);
@@ -173,6 +182,7 @@ export function useWorkbenchConversationRealtime({
     socket.on("conversation:read", onRead);
     return () => {
       socket.off("message:new", onMessage);
+      socket.off("message:deleted", onDelete);
       socket.off("conversation:updated", onConversationUpdated);
       socket.off("conversation:created", onConversationCreated);
       socket.off("typing", onTyping);

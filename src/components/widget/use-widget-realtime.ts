@@ -6,6 +6,7 @@ import type { Socket } from "socket.io-client";
 
 import type { Availability } from "@/components/widget/widget-types";
 import {
+  applyMessageDeletion,
   mergeMessageSnapshot,
   mergeMessages,
   snapshotHasOlderMessages,
@@ -24,13 +25,14 @@ type FetchState = (
 } | null>;
 
 export function useWidgetRealtime({
+  siteKey,
+  embedToken,
   socket,
   connected,
   token,
   parentOpened,
   conversationIdRef,
   messagesRef,
-  reportTrackRef,
   fetchState,
   markRead,
   setConversation,
@@ -42,13 +44,14 @@ export function useWidgetRealtime({
   setAvailability,
   setRatingSubmitted,
 }: {
+  siteKey: string;
+  embedToken: string;
   socket: Socket | null;
   connected: boolean;
   token: string | null;
   parentOpened: boolean;
   conversationIdRef: { current: string | null };
   messagesRef: { current: SerializedMessage[] };
-  reportTrackRef: { current: () => Promise<void> };
   fetchState: FetchState;
   markRead: (conversationId: string) => void;
   setConversation: Dispatch<SetStateAction<VisitorConversation | null>>;
@@ -160,6 +163,13 @@ export function useWidgetRealtime({
       }
     };
 
+    const onDelete = (payload: Parameters<typeof onMessage>[0]) => {
+      if (payload.conversationId !== conversationIdRef.current) return;
+      setConversation(payload.conversation);
+      setMessages((previous) => applyMessageDeletion(previous, payload.message));
+      setUnread(payload.conversation.unreadForVisitor);
+    };
+    socket.on("message:deleted", onDelete);
     socket.on("conversation:read", onRead);
     socket.on("conversation:created", onConversationUpdated);
     socket.on("message:new", onMessage);
@@ -167,6 +177,7 @@ export function useWidgetRealtime({
     socket.on("typing", onTyping);
     return () => {
       socket.off("conversation:read", onRead);
+      socket.off("message:deleted", onDelete);
       socket.off("conversation:created", onConversationUpdated);
       socket.off("message:new", onMessage);
       socket.off("conversation:updated", onConversationUpdated);
@@ -236,26 +247,53 @@ export function useWidgetRealtime({
   useEffect(() => {
     if (!token) return;
     const pingSocket = () => socket?.emit("visitor:ping");
-    const pingRest = async () => {
+    const socketTimer = setInterval(pingSocket, 30_000);
+    return () => clearInterval(socketTimer);
+  }, [token, socket]);
+
+  useEffect(() => {
+    if (!siteKey || (!parentOpened && !token)) return;
+    const controller = new AbortController();
+    let inFlight = false;
+    const refresh = async () => {
+      if (inFlight || (!token && document.hidden)) return;
+      inFlight = true;
       try {
-        const response = await fetch("/api/widget/ping", {
-          method: "POST",
-          headers: { authorization: `Bearer ${token}` },
-        });
+        const response = await fetch(
+          token ? "/api/widget/ping" : `/api/widget/ping?key=${encodeURIComponent(siteKey)}`,
+          {
+            method: token ? "POST" : "GET",
+            headers: token ? { authorization: `Bearer ${token}` } : { "x-beesupport-embed": embedToken },
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
         if (!response.ok) return;
         const data = (await response.json()) as { availability: Availability };
-        setAvailability(data.availability);
+        if (!controller.signal.aborted) setAvailability(data.availability);
       } catch {
         /* Ignore transient network failures. */
+      } finally {
+        inFlight = false;
       }
     };
 
-    void reportTrackRef.current().then(() => pingRest());
-    const socketTimer = setInterval(pingSocket, 30_000);
-    const restTimer = setInterval(() => void pingRest(), 60_000);
-    return () => {
-      clearInterval(socketTimer);
-      clearInterval(restTimer);
+    // Keep the existing heartbeat for signed-in visitors with a closed panel.
+    let timer: ReturnType<typeof setInterval>;
+    const schedule = () => {
+      clearInterval(timer);
+      const visible = parentOpened && !document.hidden;
+      if (visible || token) timer = setInterval(refresh, visible ? 10_000 : 60_000);
+      if (visible) void refresh();
     };
-  }, [token, socket, reportTrackRef, setAvailability]);
+    schedule();
+    window.addEventListener("online", schedule);
+    document.addEventListener("visibilitychange", schedule);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+      window.removeEventListener("online", schedule);
+      document.removeEventListener("visibilitychange", schedule);
+    };
+  }, [siteKey, embedToken, token, parentOpened, setAvailability]);
 }

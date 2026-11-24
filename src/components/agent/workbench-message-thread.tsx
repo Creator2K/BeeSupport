@@ -12,6 +12,8 @@ import type {
 import { MessageBubble } from "./message-bubble";
 
 export function WorkbenchMessageThread({
+  userId,
+  onDelete,
   conversation,
   messages,
   loading,
@@ -22,6 +24,8 @@ export function WorkbenchMessageThread({
   onScroll,
   onLoadOlder,
 }: {
+  userId: string;
+  onDelete: (message: SerializedMessage) => Promise<void>;
   conversation: SerializedConversation;
   messages: SerializedMessage[];
   loading: boolean;
@@ -72,11 +76,15 @@ export function WorkbenchMessageThread({
           key={message.id}
           message={message}
           mine={message.sender === "AGENT"}
+          onDelete={message.sender === "AGENT" && message.authorId === userId &&
+            !message.deletedAt && !message.id.startsWith("tmp-") ? () => onDelete(message) : undefined}
           locale={locale}
           receiptAt={message.readByVisitorAt}
           showAiTrace
           allowImageApproval
           labels={{
+            deleted: t("workbench.deletedMessage"),
+            deleteMessage: t("common.delete"),
             read: t("workbench.readStatus"),
             delivered: t("workbench.delivered"),
             system: t("workbench.systemMessage"),

@@ -6,7 +6,7 @@
 
 ## 从空服务器部署
 
-已发布的 `v0.1.3` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
+已发布的 `v0.1.4` 镜像支持 Linux x86_64（`amd64`）。请在服务器上安装 Docker Engine、Compose 插件、`curl` 和 `openssl`。1Panel 可在同一台服务器上配置域名、HTTPS 和反向代理。[Docker 安装文档](https://docs.docker.com/engine/install/) · [Compose 安装文档](https://docs.docker.com/compose/install/linux/)
 
 首次启动会运行三个服务。`app` 包含前端页面、平台后台、API 和 Socket.IO；PostgreSQL 和 Redis 各有自己的容器。上传文件、数据库与 Redis 数据保存在 Compose 数据卷中。
 
@@ -16,11 +16,11 @@
 docker compose version
 mkdir -p /opt/beesupport
 cd /opt/beesupport
-curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.3/docker-compose.yml \
+curl -fL https://raw.githubusercontent.com/Creator2K/BeeSupport/v0.1.4/docker-compose.yml \
   -o docker-compose.yml
 ```
 
-镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.3`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+镜像地址是 `ghcr.io/creator2k/beesupport:v0.1.4`。如果拉取时出现 `unauthorized`，在 GitHub 的 **Packages → beesupport → Package settings** 核对镜像包的可见性。GHCR 的公开镜像允许匿名拉取。若保留私有镜像，用 `docker login ghcr.io -u 你的GitHub用户名` 登录，在密码提示处输入含 `read:packages` 权限的经典访问令牌。[GitHub 容器仓库文档](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 ### 2. 生成首次安装配置
 
@@ -31,7 +31,7 @@ if [ ! -e .env ]; then
   (
     umask 077
     cat > .env <<EOF
-APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.3
+APP_IMAGE=ghcr.io/creator2k/beesupport:v0.1.4
 APP_URL=https://chat.example.com
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 AUTH_SECRET=$(openssl rand -hex 48)

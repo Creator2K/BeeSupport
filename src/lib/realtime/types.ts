@@ -20,6 +20,7 @@ export type SerializedMessage = {
   type: "TEXT" | "IMAGE" | "FILE" | "SYSTEM" | "NOTE";
   body: string;
   authorId: string | null;
+  deletedAt?: string | null;
   authorName: string | null;
   createdAt: string;
   readByAgentAt: string | null;
@@ -101,6 +102,7 @@ export type AgentPresenceStatus = "ONLINE" | "AWAY" | "OFFLINE";
 export type ServerToClientEvents = {
   "session:ready": () => void;
   "session:revoked": () => void;
+  "message:deleted": ServerToClientEvents["message:new"];
   "message:new": (payload: {
     conversationId: string;
     message: SerializedMessage;

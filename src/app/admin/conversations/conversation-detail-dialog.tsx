@@ -170,7 +170,7 @@ export function ConversationDetailDialog({
                           : "bg-muted"
                     }`}
                   >
-                    <div className="chat-text">{message.body}</div>
+                    <div className="chat-text">{message.deletedAt ? t("workbench.deletedMessage") : message.body}</div>
                     {message.attachments.length > 0 ? (
                       <div className="mt-2 space-y-1">
                         {message.attachments.map((attachment) => (

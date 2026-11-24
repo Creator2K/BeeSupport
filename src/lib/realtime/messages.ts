@@ -1,5 +1,10 @@
 import type { SerializedMessage } from "./types";
 
+/** Updating an older message must not move the cursor past unloaded history. */
+export function applyMessageDeletion(current: SerializedMessage[], deleted: SerializedMessage) {
+  return current.map((message) => message.id === deleted.id ? deleted : message);
+}
+
 /** Merge snapshots with live arrivals, replacing optimistic retries by their clientId. */
 export function mergeMessages(
   current: SerializedMessage[],
@@ -19,7 +24,11 @@ export function mergeMessages(
       )
       .map((message) => [message.id, message]),
   );
-  for (const message of incoming) merged.set(message.id, message);
+  for (const message of incoming) {
+    // A snapshot started before deletion can arrive after the live update.
+    if (!merged.get(message.id)?.deletedAt || message.deletedAt)
+      merged.set(message.id, message);
+  }
   return [...merged.values()].sort(
     (left, right) =>
       left.createdAt.localeCompare(right.createdAt) ||

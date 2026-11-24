@@ -193,7 +193,7 @@ export function assertSiteAccess(user: SessionUser, siteId: string): void {
 }
 
 /** 访客可用的客服（在线优先），用于排队提示 */
-export async function countOnlineAgents(siteId: string): Promise<number> {
+export async function countOnlineAgents(siteId: string, { includeAway = true } = {}): Promise<number> {
   const site = await prisma.site.findUnique({
     where: { id: siteId },
     select: { tenantId: true },
@@ -204,7 +204,7 @@ export async function countOnlineAgents(siteId: string): Promise<number> {
       tenantId: site.tenantId,
       role: { not: "ADMIN" },
       active: true,
-      status: { in: ["ONLINE", "AWAY"] },
+      status: includeAway ? { in: ["ONLINE", "AWAY"] } : "ONLINE",
       lastSeenAt: { gte: new Date(Date.now() - 90_000) },
       OR: [{ role: "MERCHANT_ADMIN" }, { sites: { some: { siteId } } }],
     },

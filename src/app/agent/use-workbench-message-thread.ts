@@ -187,6 +187,26 @@ export function useWorkbenchMessageThread({
     }
   }
 
+  async function deleteMessage(message: SerializedMessage) {
+    if (!window.confirm(t("workbench.deleteMessageConfirm"))) return;
+    const id = message.conversationId;
+    try {
+      const response = await fetch(`/api/agent/conversations/${id}/messages`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messageId: message.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || t("common.operationFailed"));
+      setMessages((previous) => ({
+        ...previous, [id]: mergeMessages(previous[id] ?? [], [data.message]),
+      }));
+      void loadMessages(id, true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.operationFailed"));
+    }
+  }
+
   return {
     activeId,
     setActiveId,
@@ -202,6 +222,7 @@ export function useWorkbenchMessageThread({
     markRead,
     appendMessage,
     loadOlderMessages,
+    deleteMessage,
     scrollRef,
     onScroll,
     scrollToLatest,

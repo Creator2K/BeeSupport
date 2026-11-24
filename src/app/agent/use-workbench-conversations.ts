@@ -72,6 +72,7 @@ export function useWorkbenchConversations({
     refreshList: list.refreshList,
     upsertConversation: list.upsertConversation,
     appendMessage: thread.appendMessage,
+    deleteMessage: thread.deleteMessage,
     loadMessages: thread.loadMessages,
     markRead: thread.markRead,
     loadOlderMessages: thread.loadOlderMessages,

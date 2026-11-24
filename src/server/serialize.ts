@@ -57,6 +57,7 @@ export function serializeMessage(message: MessageRecord): SerializedMessage {
     type: message.type,
     body: message.body,
     authorId: message.authorId,
+    deletedAt: message.deletedAt?.toISOString() ?? null,
     authorName: message.authorName,
     createdAt: message.createdAt.toISOString(),
     readByAgentAt: message.readByAgentAt?.toISOString() ?? null,

@@ -5,6 +5,35 @@ import { HttpError } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyVisitorRequest } from "@/server/services/risk";
 import { getSiteAvailability } from "@/lib/widget";
+import { clientIp, rateLimit, rateLimitSource } from "@/lib/rate-limit";
+import { assertWidgetOriginAllowed } from "@/lib/widget-origin";
+import { tenantCanServe } from "@/server/services/tenants";
+
+/** Public availability before the visitor starts a session. */
+export async function GET(request: Request): Promise<NextResponse> {
+  try {
+    const source = rateLimitSource(clientIp(request.headers));
+    if (!(await rateLimit(`widget:availability:${source}`, 600, 60)).ok)
+      throw new HttpError(429, "请求过于频繁，请稍后再试");
+    const key = new URL(request.url).searchParams.get("key");
+    if (!key) throw new HttpError(400, "缺少站点密钥");
+    const site = await prisma.site.findUnique({
+      where: { publicKey: key },
+      select: {
+        id: true, publicKey: true, allowedOrigins: true, workHours: true,
+        active: true, tenant: { select: { status: true, expiresAt: true } },
+      },
+    });
+    if (!site?.active || !tenantCanServe(site.tenant))
+      throw new HttpError(404, "站点不存在或已停用");
+    await assertWidgetOriginAllowed(site, request.headers);
+    return NextResponse.json({ availability: await getSiteAvailability(site) }, {
+      headers: { "cache-control": "no-store" },
+    });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
 
 /**
  * 访客心跳：续期在线状态（Redis 里 90 秒 TTL），

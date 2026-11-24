@@ -32,6 +32,7 @@ export function MessageBubble({
   showAiTrace = false,
   visitorToken,
   allowImageApproval = false,
+  onDelete,
 }: {
   message: SerializedMessage;
   /** 是否是自己发出的消息（决定左右对齐） */
@@ -45,6 +46,8 @@ export function MessageBubble({
     ai: string;
     tools: string;
     knowledge: string;
+    deleted: string;
+    deleteMessage?: string;
   };
   /** 自己发出的消息是否已被对方读取（客服端看 readByVisitorAt，访客端看 readByAgentAt） */
   receiptAt?: string | null;
@@ -52,14 +55,16 @@ export function MessageBubble({
   showAiTrace?: boolean;
   visitorToken?: string | null;
   allowImageApproval?: boolean;
+  onDelete?: () => Promise<void>;
 }) {
   const [traceOpen, setTraceOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  if (message.sender === "SYSTEM" || message.type === "SYSTEM") {
+  if (message.deletedAt || message.sender === "SYSTEM" || message.type === "SYSTEM") {
     return (
       <div className="flex justify-center py-1">
         <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-[11px]">
-          {message.body}
+          {message.deletedAt ? labels.deleted : message.body}
         </span>
       </div>
     );
@@ -193,6 +198,19 @@ export function MessageBubble({
           )}
         >
           <span>{formatTime(message.createdAt, locale)}</span>
+          {onDelete && (
+            <button
+              type="button"
+              className="px-1 py-1 underline-offset-2 hover:underline focus-visible:underline"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try { await onDelete(); } finally { setDeleting(false); }
+              }}
+            >
+              {labels.deleteMessage}
+            </button>
+          )}
           {mine && !isNote ? (
             receiptAt ? (
               <span className="inline-flex items-center gap-0.5">

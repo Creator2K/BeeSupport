@@ -102,6 +102,7 @@ export function WidgetMessageList({
           mine={message.sender === "VISITOR"}
           receiptAt={message.readByAgentAt}
           labels={{
+            deleted: t("workbench.deletedMessage"),
             read: t("workbench.readStatus"),
             delivered: t("workbench.delivered"),
             system: t("workbench.systemMessage"),

@@ -421,6 +421,7 @@ model Message {
   type           MessageType   @default(TEXT)
   body           String        @default("")
   authorId       String? // 客服消息的作者
+  deletedAt      DateTime?
   authorName     String? // 昵称快照（访客侧展示）
   clientId       String? // 客户端去重
   // 附加信息：AI 模型、工具调用轨迹、知识库命中等等

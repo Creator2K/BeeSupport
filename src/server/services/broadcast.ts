@@ -67,5 +67,5 @@ export async function broadcastMessage(messageId: string): Promise<void> {
     conversationId: message.conversationId,
     message: serializeMessage(message),
     conversation,
-  });
+  }, message.deletedAt ? "message:deleted" : "message:new");
 }

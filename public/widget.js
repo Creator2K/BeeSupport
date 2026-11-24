@@ -806,6 +806,7 @@
       applyFrameLayout(elements.container, elements.iframe);
     } else if (data.type === "beesupport:ready") {
       state.ready = true;
+      if (state.open) post({ type: "beesupport:opened" });
       applyTheme(data.site);
       renderBadge();
       pushEnv();

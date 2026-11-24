@@ -159,6 +159,8 @@ export function AgentWorkbenchView({
               />
 
               <WorkbenchMessageThread
+                userId={me.id}
+                onDelete={conversationState.deleteMessage}
                 conversation={activeConversation}
                 messages={activeMessages}
                 loading={loadingMessages}
