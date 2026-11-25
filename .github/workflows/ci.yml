@@ -62,7 +62,9 @@ jobs:
         run: node -e 'require("node:fs").appendFileSync(process.env.GITHUB_ENV, "AUTH_SECRET=" + require("node:crypto").randomBytes(48).toString("hex") + "\n")'
 
       - name: Verify
-        run: pnpm check
+        run: |
+          bash tests/online-updater-pull.sh
+          pnpm check
 
       - name: Apply migrations to an empty database
         run: pnpm db:deploy

@@ -6,6 +6,8 @@ repository=ghcr.io/creator2k/beesupport
 bootstrap_version=v0.1.3
 # The official bootstrap image can be verified without contacting GHCR.
 bootstrap_digest=sha256:6657a70c71279a83a81806fbf709ee9a344e002dd549c1a7b0f6898ca8e90aee
+# Docker archives preserve the image ID (official manifest's config digest).
+v014_image_id=sha256:533b7a114c68b65bd156d2128741bf925ef6bfd13f5d0d4412aaba43a6fde64d
 image_source=${BEESUPPORT_IMAGE_SOURCE:-github}
 version_pattern='^v(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})$'
 runner=/usr/local/libexec/beesupport-online-updater
@@ -101,6 +103,11 @@ official_digest() {
     printf '%s\n' "$bootstrap_digest"
     return
   fi
+  # Single-platform manifest published by the official v0.1.4 image workflow.
+  if [[ "$1" == v0.1.4 ]]; then
+    printf '%s\n' 'sha256:c0515b7b824833551e3570c587c118f57f147f773647df73dfa8e4027aaf71cc'
+    return
+  fi
   timeout 30s docker manifest inspect --verbose "$repository:$1" |
     awk '
       /"Descriptor"[[:space:]]*:/ { descriptor = 1; digest = ""; linux = amd64 = 0 }
@@ -117,7 +124,12 @@ official_digest() {
 }
 
 pull_image() {
-  local version=$1 image="$repository:$1" digest mirror_image
+  local version=$1 image="$repository:$1" digest mirror_image official_image source status
+  if [[ "$version" == v0.1.4 ]] && docker image inspect "$v014_image_id" >/dev/null 2>&1; then
+    echo "Using verified local BeeSupport $version image ($v014_image_id)."
+    docker tag "$v014_image_id" "$image"
+    return
+  fi
   if [[ "$image_source" == github ]]; then
     timeout 25m env APP_IMAGE="$image" docker compose pull app
     return
@@ -127,9 +139,32 @@ pull_image() {
     return 1
   fi
   mirror_image="ghcr.nju.edu.cn/creator2k/beesupport@$digest"
-  echo "Pulling BeeSupport $version via the Nanjing University mirror."
-  timeout 25m docker pull --platform linux/amd64 "$mirror_image" &&
+  official_image="$repository@$digest"
+  for source in "$mirror_image" "$official_image"; do
+    if docker image inspect "$source" >/dev/null 2>&1; then
+      echo "Using already downloaded BeeSupport $version ($source)."
+      docker tag "$source" "$image"
+      return
+    fi
+  done
+
+  # Reserve time for GHCR and app startup inside the 40-minute systemd deadline.
+  echo "Pulling BeeSupport $version via the Nanjing University mirror (10 minute limit)."
+  if timeout -k 10s 10m docker pull --platform linux/amd64 "$mirror_image"; then
     docker tag "$mirror_image" "$image"
+    return
+  else
+    status=$?
+  fi
+  echo "Mirror pull exited with status $status. Trying official GHCR with the same digest (18 minute limit)." >&2
+  if timeout -k 10s 18m docker pull --platform linux/amd64 "$official_image"; then
+    docker tag "$official_image" "$image"
+    return
+  else
+    status=$?
+  fi
+  echo "Official GHCR pull exited with status $status. Could not download $version." >&2
+  return 1
 }
 
 replace_app() {
@@ -268,6 +303,7 @@ EOF
   echo "BeeSupport updater ready. Logs: journalctl -u $unit.service"
 }
 
+if [[ ${BASH_SOURCE[0]} != "$0" ]]; then return; fi
 unset APP_IMAGE
 if [[ "${1:-}" == install && -n "${3:-}" ]]; then image_source=$3; fi
 case "$image_source" in
