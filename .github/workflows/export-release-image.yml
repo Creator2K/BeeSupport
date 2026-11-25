@@ -1,0 +1,47 @@
+name: Export existing release image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published release tag
+        required: true
+        type: string
+      digest:
+        description: Official Linux amd64 manifest digest
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Verify the published image and export it for Docker load
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          DIGEST: ${{ inputs.digest }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && $DIGEST =~ ^sha256:[0-9a-f]{64}$ ]]
+          gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          ref="$repo@$DIGEST"
+          docker pull --platform linux/amd64 "$ref"
+          test "$(docker image inspect -f '{{.Os}}/{{.Architecture}}' "$ref")" = linux/amd64
+          test "$(docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$ref")" = "$VERSION"
+          id=$(docker image inspect -f '{{.Id}}' "$ref")
+          docker tag "$ref" "$repo:$VERSION"
+          tarball="beesupport-$VERSION-linux-amd64.tar"
+          docker save -o "$tarball" "$repo:$VERSION"
+          docker image rm "$repo:$VERSION"
+          docker load -i "$tarball"
+          test "$(docker image inspect -f '{{.Id}}' "$repo:$VERSION")" = "$id"
+          sha256sum "$tarball" >> "$GITHUB_STEP_SUMMARY"
+          gh release upload "$VERSION" "$tarball" --repo "$GITHUB_REPOSITORY"
